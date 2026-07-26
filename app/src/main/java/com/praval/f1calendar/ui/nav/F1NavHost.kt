@@ -3,6 +3,7 @@ package com.praval.f1calendar.ui.nav
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
@@ -13,8 +14,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -23,6 +27,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.praval.f1calendar.ui.calendar.CalendarScreen
+import com.praval.f1calendar.ui.live.LiveScreen
+import com.praval.f1calendar.ui.live.LiveTabViewModel
 import com.praval.f1calendar.ui.racedetail.RaceDetailScreen
 import com.praval.f1calendar.ui.settings.SettingsScreen
 import com.praval.f1calendar.ui.standings.StandingsScreen
@@ -33,21 +39,42 @@ private data class TopLevelItem(
     val icon: ImageVector,
 )
 
-private val topLevelItems = listOf(
-    TopLevelItem(Destinations.CALENDAR, "Calendar", Icons.Filled.DateRange),
-    TopLevelItem(Destinations.STANDINGS, "Standings", Icons.Filled.Star),
-    TopLevelItem(Destinations.SETTINGS, "Settings", Icons.Filled.Settings),
-)
+private val calendarItem = TopLevelItem(Destinations.CALENDAR, "Calendar", Icons.Filled.DateRange)
+private val liveItem = TopLevelItem(Destinations.LIVE, "Live", Icons.Filled.PlayArrow)
+private val standingsItem = TopLevelItem(Destinations.STANDINGS, "Standings", Icons.Filled.Star)
+private val settingsItem = TopLevelItem(Destinations.SETTINGS, "Settings", Icons.Filled.Settings)
 
 @Composable
 fun F1NavHost(
     pendingRace: RaceRef?,
     onPendingRaceHandled: () -> Unit,
+    liveTabViewModel: LiveTabViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showBottomBar = currentRoute in Destinations.topLevel
+
+    // The Live tab only exists while something is actually running on track.
+    val liveVisible by liveTabViewModel.visible.collectAsStateWithLifecycle()
+    val topLevelItems = remember(liveVisible) {
+        buildList {
+            add(calendarItem)
+            if (liveVisible) add(liveItem)
+            add(standingsItem)
+            add(settingsItem)
+        }
+    }
+
+    // Don't strand the user on a tab that just disappeared when the session ended.
+    LaunchedEffect(liveVisible, currentRoute) {
+        if (!liveVisible && currentRoute == Destinations.LIVE) {
+            navController.navigate(Destinations.CALENDAR) {
+                popUpTo(navController.graph.findStartDestination().id) { inclusive = false }
+                launchSingleTop = true
+            }
+        }
+    }
 
     // A tapped reminder opens straight onto that race.
     LaunchedEffect(pendingRace) {
@@ -98,6 +125,9 @@ fun F1NavHost(
                         navController.navigate(Destinations.raceDetail(season, round))
                     },
                 )
+            }
+            composable(Destinations.LIVE) {
+                LiveScreen()
             }
             composable(Destinations.STANDINGS) {
                 StandingsScreen()

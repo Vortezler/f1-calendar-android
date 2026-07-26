@@ -7,7 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings as AndroidSettings
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,19 +19,25 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,8 +53,13 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.praval.f1calendar.data.prefs.SettingsStore
+import com.praval.f1calendar.domain.model.DefaultAlarmRules
+import com.praval.f1calendar.domain.model.SessionAlarmRule
+import com.praval.f1calendar.domain.model.SessionType
 import com.praval.f1calendar.ui.common.SectionHeader
+import com.praval.f1calendar.ui.common.displayZone
+import com.praval.f1calendar.ui.common.formatDateTime
+import com.praval.f1calendar.ui.common.formatLeadTime
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
@@ -65,6 +76,7 @@ fun SettingsScreen(
     // settings and come straight back to this screen.
     val notificationsAllowed = hasNotificationPermission(context)
     val exactAlarmsAllowed = viewModel.canScheduleExactAlarms()
+    val zone = remember(state.useUtc) { displayZone(state.useUtc) }
 
     Scaffold(
         topBar = {
@@ -85,15 +97,15 @@ fun SettingsScreen(
                 .padding(padding),
             contentPadding = PaddingValues(bottom = 32.dp),
         ) {
-            item { SectionHeader("Reminders") }
+            item { SectionHeader("Alarms") }
 
             item {
                 SettingRow(
-                    title = "Session reminders",
+                    title = "Session alarms",
                     subtitle = if (state.remindersEnabled) {
-                        "Notify me before sessions I've starred"
+                        "${state.armedCount} of ${SessionType.entries.size} session types armed"
                     } else {
-                        "All reminders are paused"
+                        "All alarms are paused"
                     },
                     trailing = {
                         Switch(
@@ -104,21 +116,35 @@ fun SettingsScreen(
                 )
             }
 
-            item {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text(
-                        text = "Notify me before a session starts",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SettingsStore.LEAD_TIME_OPTIONS.forEach { minutes ->
-                            FilterChip(
-                                selected = state.leadMinutes == minutes,
-                                onClick = { viewModel.setLeadMinutes(minutes) },
-                                enabled = state.remindersEnabled,
-                                label = { Text(formatLeadTime(minutes)) },
+            state.nextAlarm?.let { next ->
+                item(key = "next-alarm") {
+                    val start = next.race.session(next.type)?.startsAt
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
+                        Column(Modifier.padding(14.dp)) {
+                            Text(
+                                text = "NEXT ALARM",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
                             )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "${next.type.label} · ${next.race.name}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            if (start != null) {
+                                Text(
+                                    text = "Session starts ${formatDateTime(start, zone)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                         }
                     }
                 }
@@ -128,7 +154,7 @@ fun SettingsScreen(
                 item {
                     PermissionRow(
                         title = "Notifications are blocked",
-                        subtitle = "Reminders can't be delivered until notifications are allowed.",
+                        subtitle = "Alarms can't be delivered until notifications are allowed.",
                         buttonText = "Open settings",
                         onClick = { context.openNotificationSettings() },
                     )
@@ -139,31 +165,61 @@ fun SettingsScreen(
                 item {
                     PermissionRow(
                         title = "Exact alarms not allowed",
-                        subtitle = "Reminders still work, but may arrive a few minutes late.",
+                        subtitle = "Alarms still work, but may arrive a few minutes late.",
                         buttonText = "Allow",
                         onClick = { context.openExactAlarmSettings() },
                     )
                 }
             }
 
+            item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
             item {
-                SettingRow(
-                    title = "Starred sessions",
-                    subtitle = if (state.activeReminderCount == 0) {
-                        "None yet — star sessions from a race's page"
-                    } else {
-                        "${state.activeReminderCount} session${
-                            if (state.activeReminderCount == 1) "" else "s"
-                        } with a reminder"
-                    },
-                    trailing = {
-                        if (state.activeReminderCount > 0) {
-                            OutlinedButton(onClick = viewModel::clearAllReminders) {
-                                Text("Clear all")
-                            }
-                        }
-                    },
+                SectionHeader("Which sessions get an alarm")
+            }
+            item {
+                Text(
+                    text = "Applies to every weekend on the calendar. Individual sessions can " +
+                        "still be changed from a race's page.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp),
                 )
+            }
+
+            items(state.orderedRules, key = { it.type.name }) { rule ->
+                SessionRuleRow(
+                    rule = rule,
+                    enabled = state.remindersEnabled,
+                    onToggle = { viewModel.setRuleEnabled(rule.type, it) },
+                    onLeadChange = { viewModel.setRuleLeadMinutes(rule.type, it) },
+                )
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = if (state.overrideCount == 0) {
+                                "No per-weekend changes"
+                            } else {
+                                "${state.overrideCount} session${
+                                    if (state.overrideCount == 1) "" else "s"
+                                } changed for one weekend only"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (state.overrideCount > 0) {
+                        TextButton(onClick = viewModel::clearOverrides) { Text("Clear") }
+                    }
+                    OutlinedButton(onClick = viewModel::resetRules) { Text("Reset") }
+                }
             }
 
             item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
@@ -206,8 +262,9 @@ fun SettingsScreen(
             item {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Text(
-                        text = "Race data from the Jolpica-F1 API, the community successor to " +
-                            "Ergast. Times are published in UTC and converted for display.",
+                        text = "Schedule, results and standings from the Jolpica-F1 API, the " +
+                            "community successor to Ergast. Live timing from OpenF1. Times are " +
+                            "published in UTC and converted for display.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -218,6 +275,93 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionRuleRow(
+    rule: SessionAlarmRule,
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onLeadChange: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = rule.type.label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        // The lead time is meaningless while the type is off, so hide rather than grey it.
+        if (rule.enabled) {
+            LeadTimePicker(
+                minutes = rule.leadMinutes,
+                enabled = enabled,
+                onSelect = onLeadChange,
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Switch(
+            checked = rule.enabled,
+            onCheckedChange = onToggle,
+            enabled = enabled,
+        )
+    }
+}
+
+@Composable
+private fun LeadTimePicker(
+    minutes: Int,
+    enabled: Boolean,
+    onSelect: (Int) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .clickable(enabled = enabled) { expanded = true }
+                .padding(horizontal = 6.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = formatLeadTime(minutes),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Icon(
+                Icons.Filled.ArrowDropDown,
+                contentDescription = "Change lead time",
+                tint = if (enabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DefaultAlarmRules.LEAD_TIME_OPTIONS.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            formatLeadTime(option),
+                            fontWeight = if (option == minutes) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    },
+                    onClick = {
+                        onSelect(option)
+                        expanded = false
+                    },
+                )
             }
         }
     }
@@ -381,13 +525,6 @@ private fun SeasonSetting(
             }
         }
     }
-}
-
-private fun formatLeadTime(minutes: Int): String = when {
-    minutes < 60 -> "$minutes min"
-    minutes == 60 -> "1 hour"
-    minutes % 60 == 0 -> "${minutes / 60} hours"
-    else -> "${minutes / 60}h ${minutes % 60}m"
 }
 
 private fun hasNotificationPermission(context: Context): Boolean =

@@ -62,6 +62,7 @@ import com.praval.f1calendar.ui.common.displayZone
 import com.praval.f1calendar.ui.common.formatCountdown
 import com.praval.f1calendar.ui.common.formatDateTime
 import com.praval.f1calendar.ui.common.formatFullDate
+import com.praval.f1calendar.ui.common.formatLeadTime
 import com.praval.f1calendar.ui.common.rememberTickingNow
 import java.time.Instant
 import java.time.ZoneId
@@ -99,16 +100,16 @@ fun RaceDetailScreen(
         pending = null
         if (!granted || request == null) return@rememberLauncherForActivityResult
         when (request) {
-            is PendingReminder.Session -> viewModel.setReminder(request.type, true)
-            PendingReminder.All -> viewModel.setAllReminders(true)
+            is PendingReminder.Session -> viewModel.setAlarm(request.type, true)
+            PendingReminder.All -> viewModel.setAllAlarms(true)
         }
     }
 
     fun enableWithPermission(request: PendingReminder) {
         if (hasNotificationPermission(context)) {
             when (request) {
-                is PendingReminder.Session -> viewModel.setReminder(request.type, true)
-                PendingReminder.All -> viewModel.setAllReminders(true)
+                is PendingReminder.Session -> viewModel.setAlarm(request.type, true)
+                PendingReminder.All -> viewModel.setAllAlarms(true)
             }
         } else {
             pending = request
@@ -146,10 +147,10 @@ fun RaceDetailScreen(
                 },
                 actions = {
                     if (race != null && race.sessions.any { it.startsAt != null }) {
-                        val allOn = state.allRemindersOn
+                        val allOn = state.allAlarmsOn
                         IconButton(
                             onClick = {
-                                if (allOn) viewModel.setAllReminders(false)
+                                if (allOn) viewModel.setAllAlarms(false)
                                 else enableWithPermission(PendingReminder.All)
                             },
                         ) {
@@ -212,11 +213,11 @@ fun RaceDetailScreen(
                             race = race,
                             now = now,
                             zone = zone,
-                            reminded = state.remindedSessions,
+                            state = state,
                             exactAlarmsAvailable = viewModel.canScheduleExactAlarms(),
                             onToggle = { type, enabled ->
                                 if (enabled) enableWithPermission(PendingReminder.Session(type))
-                                else viewModel.setReminder(type, false)
+                                else viewModel.setAlarm(type, false)
                             },
                         )
 
@@ -245,7 +246,7 @@ private fun SessionsTab(
     race: Race,
     now: Instant,
     zone: ZoneId,
-    reminded: Set<SessionType>,
+    state: RaceDetailUiState,
     exactAlarmsAvailable: Boolean,
     onToggle: (SessionType, Boolean) -> Unit,
 ) {
@@ -286,10 +287,10 @@ private fun SessionsTab(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
 
-        if (!exactAlarmsAvailable && reminded.isNotEmpty()) {
+        if (!exactAlarmsAvailable && sessions.any { state.alarmOn(it.type) }) {
             item(key = "exact-alarm-note") {
                 Text(
-                    text = "Exact alarms are off for this app, so reminders may arrive a few " +
+                    text = "Exact alarms are off for this app, so alarms may arrive a few " +
                         "minutes late. You can allow them in Settings.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -303,7 +304,9 @@ private fun SessionsTab(
                 session = session,
                 now = now,
                 zone = zone,
-                reminderOn = session.type in reminded,
+                alarmOn = state.alarmOn(session.type),
+                leadMinutes = state.leadMinutes(session.type),
+                overridden = state.isOverridden(session.type),
                 onToggle = { onToggle(session.type, it) },
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -316,7 +319,9 @@ private fun SessionRow(
     session: RaceSession,
     now: Instant,
     zone: ZoneId,
-    reminderOn: Boolean,
+    alarmOn: Boolean,
+    leadMinutes: Int,
+    overridden: Boolean,
     onToggle: (Boolean) -> Unit,
 ) {
     val start = session.startsAt
@@ -349,10 +354,22 @@ private fun SessionRow(
                     fontWeight = FontWeight.Medium,
                 )
             }
+            if (upcoming && alarmOn) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = buildString {
+                        append("Alarm ${formatLeadTime(leadMinutes)} before")
+                        // Make it obvious this weekend deviates from the standing rule.
+                        if (overridden) append(" · just this weekend")
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        // A reminder can only be set for something that hasn't happened yet.
+        // An alarm can only be set for something that hasn't happened yet.
         if (upcoming) {
-            Switch(checked = reminderOn, onCheckedChange = onToggle)
+            Switch(checked = alarmOn, onCheckedChange = onToggle)
         }
     }
 }

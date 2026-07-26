@@ -7,6 +7,7 @@ import com.praval.f1calendar.data.local.dao.CacheDao
 import com.praval.f1calendar.data.local.dao.RaceDao
 import com.praval.f1calendar.data.local.dao.ReminderDao
 import com.praval.f1calendar.data.local.dao.ResultDao
+import com.praval.f1calendar.data.local.dao.SessionRuleDao
 import com.praval.f1calendar.data.local.dao.StandingsDao
 import dagger.Module
 import dagger.Provides
@@ -39,6 +40,9 @@ object DatabaseModule {
 
     @Provides
     fun provideReminderDao(db: F1Database): ReminderDao = db.reminderDao()
+
+    @Provides
+    fun provideSessionRuleDao(db: F1Database): SessionRuleDao = db.sessionRuleDao()
 
     @Provides
     fun provideCacheDao(db: F1Database): CacheDao = db.cacheDao()

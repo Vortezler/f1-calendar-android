@@ -113,13 +113,34 @@ data class ConstructorStandingEntity(
     val nationality: String?,
 )
 
-/** One row per session the user wants to be reminded about. */
+/**
+ * A per-session override of the standing alarm rule for that session type.
+ *
+ * A row exists only when the user has explicitly overridden one weekend's session — turning a
+ * practice alarm on for a home race, or muting qualifying for a weekend they'll be watching live.
+ * With no row, [SessionRuleEntity] decides.
+ */
 @Entity(tableName = "reminders", primaryKeys = ["season", "round", "session"])
 data class ReminderEntity(
     val season: Int,
     val round: Int,
     /** [com.praval.f1calendar.domain.model.SessionType] name. */
     val session: String,
+    val enabled: Boolean,
+)
+
+/**
+ * The standing rule for a session type: whether it gets an alarm at all, and how far ahead.
+ *
+ * Absent rows fall back to [com.praval.f1calendar.domain.model.DefaultAlarmRules], so the table
+ * only ever holds what the user actually changed.
+ */
+@Entity(tableName = "session_rules")
+data class SessionRuleEntity(
+    /** [com.praval.f1calendar.domain.model.SessionType] name. */
+    @PrimaryKey val session: String,
+    val enabled: Boolean,
+    val leadMinutes: Int,
 )
 
 /** Tracks when each remote resource was last fetched so refreshes can respect a TTL. */

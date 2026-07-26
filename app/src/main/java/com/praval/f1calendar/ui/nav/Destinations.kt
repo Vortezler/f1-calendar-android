@@ -5,6 +5,7 @@ data class RaceRef(val season: Int, val round: Int)
 
 object Destinations {
     const val CALENDAR = "calendar"
+    const val LIVE = "live"
     const val STANDINGS = "standings"
     const val SETTINGS = "settings"
 
@@ -15,5 +16,5 @@ object Destinations {
     fun raceDetail(season: Int, round: Int) = "race/$season/$round"
 
     /** Destinations that show the bottom bar; the detail screen is a pushed page instead. */
-    val topLevel = listOf(CALENDAR, STANDINGS, SETTINGS)
+    val topLevel = listOf(CALENDAR, LIVE, STANDINGS, SETTINGS)
 }

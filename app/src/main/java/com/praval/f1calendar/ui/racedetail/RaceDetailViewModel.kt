@@ -9,6 +9,7 @@ import com.praval.f1calendar.data.repository.RaceRepository
 import com.praval.f1calendar.domain.model.QualifyingResult
 import com.praval.f1calendar.domain.model.Race
 import com.praval.f1calendar.domain.model.RaceResult
+import com.praval.f1calendar.domain.model.SessionAlarmRule
 import com.praval.f1calendar.domain.model.SessionType
 import com.praval.f1calendar.notifications.NotificationScheduler
 import com.praval.f1calendar.ui.nav.Destinations
@@ -30,17 +31,28 @@ data class RaceDetailUiState(
     val race: Race? = null,
     val results: List<RaceResult> = emptyList(),
     val qualifying: List<QualifyingResult> = emptyList(),
-    val remindedSessions: Set<SessionType> = emptySet(),
+    /** Standing per-type rules, as configured in Settings. */
+    val rules: Map<SessionType, SessionAlarmRule> = emptyMap(),
+    /** Sessions of *this* weekend that deviate from their type's rule. */
+    val overrides: Map<SessionType, Boolean> = emptyMap(),
     val useUtc: Boolean = false,
     val isRefreshing: Boolean = false,
     val loadedOnce: Boolean = false,
     val errorMessage: String? = null,
 ) {
-    /** True when every session that *can* carry a reminder already has one. */
-    val allRemindersOn: Boolean
+    fun alarmOn(type: SessionType): Boolean =
+        overrides[type] ?: rules[type]?.enabled ?: false
+
+    fun leadMinutes(type: SessionType): Int = rules[type]?.leadMinutes ?: 0
+
+    /** True when this weekend's setting differs from the standing rule for that session type. */
+    fun isOverridden(type: SessionType): Boolean = type in overrides
+
+    /** True when every session that *can* carry an alarm has one. */
+    val allAlarmsOn: Boolean
         get() {
-            val remindable = race?.sessions?.filter { it.startsAt != null }?.map { it.type }.orEmpty()
-            return remindable.isNotEmpty() && remindedSessions.containsAll(remindable)
+            val armable = race?.sessions?.filter { it.startsAt != null }?.map { it.type }.orEmpty()
+            return armable.isNotEmpty() && armable.all { alarmOn(it) }
         }
 }
 
@@ -67,16 +79,20 @@ class RaceDetailViewModel @Inject constructor(
         raceRepository.observeRace(season, round),
         raceRepository.observeResults(season, round),
         raceRepository.observeQualifying(season, round),
-        scheduler.observeReminders(season, round),
+        combine(
+            scheduler.observeRules(),
+            scheduler.observeOverrides(season, round),
+        ) { rules, overrides -> rules to overrides },
         combine(settings.useUtc, loadState) { useUtc, load -> useUtc to load },
-    ) { race, results, qualifying, reminders, (useUtc, load) ->
+    ) { race, results, qualifying, (rules, overrides), (useUtc, load) ->
         RaceDetailUiState(
             season = season,
             round = round,
             race = race,
             results = results,
             qualifying = qualifying,
-            remindedSessions = reminders,
+            rules = rules,
+            overrides = overrides,
             useUtc = useUtc,
             isRefreshing = load.refreshing,
             loadedOnce = load.loadedOnce,
@@ -100,14 +116,14 @@ class RaceDetailViewModel @Inject constructor(
 
     fun canScheduleExactAlarms(): Boolean = scheduler.canScheduleExactAlarms()
 
-    fun setReminder(type: SessionType, enabled: Boolean) {
+    fun setAlarm(type: SessionType, enabled: Boolean) {
         viewModelScope.launch {
             val race = raceRepository.observeRace(season, round).first() ?: return@launch
-            scheduler.setReminder(race, type, enabled)
+            scheduler.setOverride(race, type, enabled)
         }
     }
 
-    fun setAllReminders(enabled: Boolean) {
+    fun setAllAlarms(enabled: Boolean) {
         viewModelScope.launch {
             val race = raceRepository.observeRace(season, round).first() ?: return@launch
             scheduler.setAllForRace(race, enabled)

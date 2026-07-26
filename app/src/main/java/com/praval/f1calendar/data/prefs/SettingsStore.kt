@@ -22,8 +22,6 @@ class SettingsStore @Inject constructor(
 ) {
     private val store get() = context.settingsDataStore
 
-    val leadMinutes: Flow<Int> = store.data.map { it[KEY_LEAD_MINUTES] ?: DEFAULT_LEAD_MINUTES }
-
     /** When true the whole app renders times in UTC instead of the device timezone. */
     val useUtc: Flow<Boolean> = store.data.map { it[KEY_USE_UTC] ?: false }
 
@@ -39,8 +37,6 @@ class SettingsStore @Inject constructor(
      */
     val resolvedCurrentSeason: Flow<Int> = store.data.map { it[KEY_RESOLVED_SEASON] ?: 0 }
 
-    suspend fun setLeadMinutes(minutes: Int) = store.edit { it[KEY_LEAD_MINUTES] = minutes }
-
     suspend fun setUseUtc(value: Boolean) = store.edit { it[KEY_USE_UTC] = value }
 
     suspend fun setRemindersEnabled(value: Boolean) = store.edit { it[KEY_REMINDERS_ENABLED] = value }
@@ -49,16 +45,13 @@ class SettingsStore @Inject constructor(
 
     suspend fun setResolvedCurrentSeason(season: Int) = store.edit { it[KEY_RESOLVED_SEASON] = season }
 
-    suspend fun leadMinutesNow(): Int = leadMinutes.first()
-
     suspend fun remindersEnabledNow(): Boolean = remindersEnabled.first()
+
+    suspend fun resolvedCurrentSeasonNow(): Int = resolvedCurrentSeason.first()
 
     companion object {
         const val FOLLOW_CURRENT = 0
-        const val DEFAULT_LEAD_MINUTES = 30
-        val LEAD_TIME_OPTIONS = listOf(15, 30, 60, 120)
 
-        private val KEY_LEAD_MINUTES = intPreferencesKey("lead_minutes")
         private val KEY_USE_UTC = booleanPreferencesKey("use_utc")
         private val KEY_REMINDERS_ENABLED = booleanPreferencesKey("reminders_enabled")
         private val KEY_SELECTED_SEASON = intPreferencesKey("selected_season")

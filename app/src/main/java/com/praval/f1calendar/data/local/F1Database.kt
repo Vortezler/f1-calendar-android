@@ -6,6 +6,7 @@ import com.praval.f1calendar.data.local.dao.CacheDao
 import com.praval.f1calendar.data.local.dao.RaceDao
 import com.praval.f1calendar.data.local.dao.ReminderDao
 import com.praval.f1calendar.data.local.dao.ResultDao
+import com.praval.f1calendar.data.local.dao.SessionRuleDao
 import com.praval.f1calendar.data.local.dao.StandingsDao
 import com.praval.f1calendar.data.local.entity.CacheMetaEntity
 import com.praval.f1calendar.data.local.entity.ConstructorStandingEntity
@@ -14,6 +15,7 @@ import com.praval.f1calendar.data.local.entity.QualifyingResultEntity
 import com.praval.f1calendar.data.local.entity.RaceEntity
 import com.praval.f1calendar.data.local.entity.RaceResultEntity
 import com.praval.f1calendar.data.local.entity.ReminderEntity
+import com.praval.f1calendar.data.local.entity.SessionRuleEntity
 
 @Database(
     entities = [
@@ -23,9 +25,12 @@ import com.praval.f1calendar.data.local.entity.ReminderEntity
         DriverStandingEntity::class,
         ConstructorStandingEntity::class,
         ReminderEntity::class,
+        SessionRuleEntity::class,
         CacheMetaEntity::class,
     ],
-    version = 1,
+    // v2 adds session_rules and ReminderEntity.enabled. Destructive fallback is configured, so
+    // upgrading rebuilds the cache and resets alarm preferences to their defaults.
+    version = 2,
     exportSchema = true,
 )
 abstract class F1Database : RoomDatabase() {
@@ -33,6 +38,7 @@ abstract class F1Database : RoomDatabase() {
     abstract fun resultDao(): ResultDao
     abstract fun standingsDao(): StandingsDao
     abstract fun reminderDao(): ReminderDao
+    abstract fun sessionRuleDao(): SessionRuleDao
     abstract fun cacheDao(): CacheDao
 
     companion object {

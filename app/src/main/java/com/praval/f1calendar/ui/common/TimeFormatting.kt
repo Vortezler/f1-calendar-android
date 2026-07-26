@@ -83,6 +83,14 @@ fun formatCountdown(now: Instant, target: Instant): String {
     }
 }
 
+/** Alarm lead times, e.g. 15 -> "15 min", 120 -> "2 hours". */
+fun formatLeadTime(minutes: Int): String = when {
+    minutes < 60 -> "$minutes min"
+    minutes == 60 -> "1 hour"
+    minutes % 60 == 0 -> "${minutes / 60} hours"
+    else -> "${minutes / 60}h ${minutes % 60}m"
+}
+
 /** "in 3 days" / "2 days ago" style label for calendar rows. */
 fun formatRelativeDays(now: Instant, target: Instant): String {
     val days = Duration.between(now, target).toDays()

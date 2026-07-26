@@ -14,6 +14,7 @@ import com.praval.f1calendar.data.local.entity.QualifyingResultEntity
 import com.praval.f1calendar.data.local.entity.RaceEntity
 import com.praval.f1calendar.data.local.entity.RaceResultEntity
 import com.praval.f1calendar.data.local.entity.ReminderEntity
+import com.praval.f1calendar.data.local.entity.SessionRuleEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -152,11 +153,31 @@ interface ReminderDao {
     @Delete
     suspend fun delete(reminder: ReminderEntity)
 
+    /** Drops the override so the session falls back to its type's standing rule. */
+    @Query("DELETE FROM reminders WHERE season = :season AND round = :round AND session = :session")
+    suspend fun clearOverride(season: Int, round: Int, session: String)
+
     @Query("DELETE FROM reminders WHERE season = :season AND round = :round")
     suspend fun deleteForRace(season: Int, round: Int)
 
     @Query("DELETE FROM reminders")
     suspend fun deleteAll()
+}
+
+@Dao
+interface SessionRuleDao {
+
+    @Query("SELECT * FROM session_rules")
+    fun observeAll(): Flow<List<SessionRuleEntity>>
+
+    @Query("SELECT * FROM session_rules")
+    suspend fun getAll(): List<SessionRuleEntity>
+
+    @Upsert
+    suspend fun upsert(rule: SessionRuleEntity)
+
+    @Query("DELETE FROM session_rules")
+    suspend fun clear()
 }
 
 @Dao

@@ -1,7 +1,8 @@
 # F1 Calendar
 
 Android app for the Formula 1 season: race calendar, session times in your local timezone,
-results and qualifying classifications, championship standings, and reminders before sessions start.
+results and qualifying classifications, championship standings, alarms before sessions start, and
+live timing while a session is running.
 
 ## Build
 
@@ -32,15 +33,23 @@ reminders. `minSdk 26`, `compileSdk`/`targetSdk 35`.
 | Gradle | 9.5 |
 | Compose BOM | 2025.06.01 |
 
-## Data source
+## Data sources
 
-[Jolpica-F1](https://api.jolpi.ca/ergast/f1/), the community successor to the retired Ergast API.
-No key required. Every timestamp it returns is UTC; conversion to the display timezone happens in
-the UI layer only.
+Both are open and need no API key or account.
 
-The API splits a session timestamp across two fields (`date`: `2026-03-08`, `time`: `04:00:00Z`) and
-reports all scalars — including numbers — as strings, so the DTO layer mirrors that shape verbatim
-and the mapper layer does the typing.
+**[Jolpica-F1](https://api.jolpi.ca/ergast/f1/)** — schedule, results, qualifying, standings. The
+community successor to the retired Ergast API. It splits a session timestamp across two fields
+(`date`: `2026-03-08`, `time`: `04:00:00Z`) and reports all scalars — including numbers — as
+strings, so the DTO layer mirrors that shape verbatim and the mapper layer does the typing.
+
+**[OpenF1](https://openf1.org)** — live timing for the Live tab. Every endpoint returns the full
+matching *history* rather than a current snapshot, so the repository keeps a running picture in
+memory and bounds each poll with a timestamp filter; an unbounded `intervals` request for a whole
+grand prix is megabytes. Its `interval` and `gap_to_leader` fields are numbers until a driver is
+lapped, at which point they become strings like `+1 LAP`, so they're parsed as raw JSON.
+
+Every timestamp from both APIs is UTC; conversion to the display timezone happens in the UI layer
+only.
 
 ## Architecture
 
@@ -56,26 +65,43 @@ cached data rather than replacing it with an error page.
 Cache TTLs: schedule 1h, results/qualifying 1h, standings 6h. A classification for a race that
 finished more than 24h ago is treated as final and never refetched.
 
+Live timing is the one exception: it bypasses Room entirely and is polled straight into the UI.
+
 ```
 app/
   core/           Res<T>, country→flag emoji, team livery colours
   data/
-    remote/       Retrofit interface, DTOs, error→message mapping
+    remote/       Jolpica Retrofit interface, DTOs, error→message mapping
+    live/         OpenF1 interface, DTOs, polling repository
     local/        Room entities, DAOs, database
     mapper/       DTO→entity→domain
     prefs/        DataStore settings
     repository/   RaceRepository, StandingsRepository
-  domain/model/   Race, sessions, results, standings
+  domain/model/   Race, sessions, results, standings, alarm rules, live timing
   notifications/  scheduler, alarm receiver, boot receiver, sync worker
-  ui/             calendar, racedetail, standings, settings, nav, theme, common
+  ui/             calendar, racedetail, live, standings, settings, nav, theme, common
   di/             Hilt modules
 ```
 
-## Reminders
+## Alarms
 
-Reminder rows in Room are the source of truth for *what* the user wants; the alarms themselves are
-derived state, rebuilt whenever the schedule changes, the lead time changes, the device reboots, or
-the timezone changes (`ScheduleSyncWorker`, daily + on those events).
+Two layers decide whether a session rings, and neither is an alarm by itself:
+
+1. a **standing rule per session type** — "every qualifying, 30 minutes ahead" — set in Settings and
+   applied to every weekend on the calendar. Out of the box the race gets an hour's notice,
+   qualifying and the sprint sessions half an hour, and free practice is off.
+2. an optional **per-weekend override**, toggled from a race's page, for the one session that
+   differs. Setting a session back to its type's default drops the override rather than pinning it,
+   so later rule changes keep applying.
+
+`NotificationScheduler.rescheduleAll()` is the single place that reconciles those preferences
+against the cached calendar and the clock, and it is idempotent. It runs after any preference
+change, and daily from `ScheduleSyncWorker`, which also re-runs after a reboot, an app update, or a
+timezone change — alarms don't survive any of those.
+
+Only sessions within a **10-day horizon** are armed. A season is ~24 weekends of up to five sessions
+each, and holding 120 exact alarms a year out is both wasteful and pointless: the daily worker rolls
+the window forward, and the API's provisional times for distant rounds change anyway.
 
 From Android 12, exact alarms are a user-grantable permission that defaults to **denied** for apps
 that aren't alarm clocks. The scheduler checks `canScheduleExactAlarms()` and falls back to
@@ -83,11 +109,29 @@ that aren't alarm clocks. The scheduler checks `canScheduleExactAlarms()` and fa
 grant it. The notification reads the remaining time at delivery rather than trusting the configured
 lead time, so a late inexact alarm doesn't claim "starts in 30 min" when it doesn't.
 
+## Live timing
+
+The **Live** tab only exists while a session is running — it appears about 15 minutes before the
+green light and stays for 20 minutes past the scheduled end, because sessions overrun. If the tab
+disappears while you're on it, the nav host moves you back to the calendar.
+
+A race is ordered by track position and shows interval and gap to the leader. Practice and
+qualifying are ranked by best lap, using the lap time actually displayed rather than OpenF1's
+position field, which can disagree with it mid-session. Out-laps are excluded from best-lap
+calculations.
+
+Live data is polled every 8 seconds and held in memory only — it is meaningless outside the session
+and superseded within seconds, so none of it is written to Room.
+
 ## Known limitations
 
 - Only user preferences are included in cloud backup. The Room database is excluded — it is mostly
   rebuildable cache, and backing it up safely would mean including its `-wal`/`-shm` sidecars — so
-  starred reminders do not survive a device transfer.
+  alarm rules and per-weekend overrides do not survive a device transfer.
+- Upgrading from v1.0 runs a destructive Room migration (schema v1 → v2), which resets alarm
+  preferences to their defaults.
+- OpenF1 only covers recent seasons, so the Live tab is inert for historical ones. It also has no
+  concept of sector-by-sector timing here — the tab shows position, interval/gap and lap times.
 - Sessions the API publishes without a start time are omitted from the sessions list; the grand prix
   itself is always shown, dated even when untimed. This only affects pre-2005 seasons.
 - Times display on a 24-hour clock regardless of locale, matching F1 timing convention.
