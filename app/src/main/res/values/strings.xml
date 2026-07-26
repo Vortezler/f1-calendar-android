@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">F1 Calendar</string>
+    <string name="channel_sessions_name">Session reminders</string>
+    <string name="channel_sessions_description">Alerts shortly before a practice, qualifying or race session starts.</string>
+</resources>

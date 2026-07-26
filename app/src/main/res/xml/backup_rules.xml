@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!--
+      Only user preferences are backed up. DataStore writes to filesDir/datastore, which is the
+      "file" domain rather than "sharedpref".
+
+      The Room database is deliberately left out: it is almost entirely a rebuildable cache, and
+      backing it up safely would mean including its -wal and -shm sidecars too. The cost is that
+      starred session reminders don't survive a restore.
+    -->
+    <include domain="file" path="datastore" />
+</full-backup-content>

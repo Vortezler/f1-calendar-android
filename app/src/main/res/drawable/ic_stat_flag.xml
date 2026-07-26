@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar icons are masked to a single colour, so this is a solid-alpha silhouette. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3,2h2v20h-2z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6,3h4.5v4.5h-4.5z
+                          M15,3h4.5v4.5h-4.5z
+                          M10.5,7.5h4.5v4.5h-4.5z
+                          M6,12h4.5v4.5h-4.5z
+                          M15,12h4.5v4.5h-4.5z" />
+</vector>
