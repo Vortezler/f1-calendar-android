@@ -79,9 +79,25 @@ app/
     repository/   RaceRepository, StandingsRepository
   domain/model/   Race, sessions, results, standings, alarm rules, live timing
   notifications/  scheduler, alarm receiver, boot receiver, sync worker
-  ui/             calendar, racedetail, live, standings, settings, nav, theme, common
+  ui/             calendar, live, standings, settings, nav, theme, common
   di/             Hilt modules
 ```
+
+## The calendar screen
+
+The season is a **drum picker**: rows rotate about the X axis in proportion to their distance from
+the centre of the viewport, fading and shrinking with it, so the list reads as a physical wheel
+turning rather than a flat list scrolling. The transform runs in a deferred `graphicsLayer` block,
+so it is recalculated at draw time on every scroll frame without recomposing the rows.
+
+Selection is reported *continuously* while the wheel is still moving, so the page beneath tracks the
+spin. Network fetches for the selected round are debounced by 350 ms so scrolling past ten rounds
+doesn't fire ten requests.
+
+Everything about the chosen round lives on that one page: where and when, every session with its
+own alarm toggle and countdown, the race and qualifying classifications, and the drivers'
+championship. There is no separate race-detail page — a tapped alarm spins the wheel to that round
+instead of pushing a new screen.
 
 ## Alarms
 

@@ -43,7 +43,7 @@ import com.praval.f1calendar.ui.common.ErrorBanner
 import com.praval.f1calendar.ui.common.LoadingState
 import com.praval.f1calendar.ui.common.PositionBadge
 import com.praval.f1calendar.ui.common.TeamAccent
-import com.praval.f1calendar.ui.racedetail.formatPoints
+import com.praval.f1calendar.ui.common.formatPoints
 
 private enum class StandingsTab(val title: String) {
     DRIVERS("Drivers"),

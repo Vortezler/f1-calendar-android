@@ -20,16 +20,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.praval.f1calendar.ui.calendar.CalendarScreen
 import com.praval.f1calendar.ui.live.LiveScreen
 import com.praval.f1calendar.ui.live.LiveTabViewModel
-import com.praval.f1calendar.ui.racedetail.RaceDetailScreen
 import com.praval.f1calendar.ui.settings.SettingsScreen
 import com.praval.f1calendar.ui.standings.StandingsScreen
 
@@ -46,8 +43,9 @@ private val settingsItem = TopLevelItem(Destinations.SETTINGS, "Settings", Icons
 
 @Composable
 fun F1NavHost(
-    pendingRace: RaceRef?,
-    onPendingRaceHandled: () -> Unit,
+    /** Set when a session alarm is tapped; the round itself is applied by the calendar's ViewModel. */
+    showCalendarForAlarm: Boolean,
+    onAlarmNavigationHandled: () -> Unit,
     liveTabViewModel: LiveTabViewModel = hiltViewModel(),
 ) {
     val navController = rememberNavController()
@@ -76,13 +74,17 @@ fun F1NavHost(
         }
     }
 
-    // A tapped reminder opens straight onto that race.
-    LaunchedEffect(pendingRace) {
-        val race = pendingRace ?: return@LaunchedEffect
-        navController.navigate(Destinations.raceDetail(race.season, race.round)) {
-            launchSingleTop = true
+    // A tapped alarm brings the calendar forward; CalendarViewModel spins the wheel to the round.
+    LaunchedEffect(showCalendarForAlarm) {
+        if (!showCalendarForAlarm) return@LaunchedEffect
+        if (currentRoute != Destinations.CALENDAR) {
+            navController.navigate(Destinations.CALENDAR) {
+                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
         }
-        onPendingRaceHandled()
+        onAlarmNavigationHandled()
     }
 
     Scaffold(
@@ -120,11 +122,7 @@ fun F1NavHost(
             ),
         ) {
             composable(Destinations.CALENDAR) {
-                CalendarScreen(
-                    onRaceClick = { season, round ->
-                        navController.navigate(Destinations.raceDetail(season, round))
-                    },
-                )
+                CalendarScreen()
             }
             composable(Destinations.LIVE) {
                 LiveScreen()
@@ -134,15 +132,6 @@ fun F1NavHost(
             }
             composable(Destinations.SETTINGS) {
                 SettingsScreen()
-            }
-            composable(
-                route = Destinations.RACE_DETAIL,
-                arguments = listOf(
-                    navArgument(Destinations.ARG_SEASON) { type = NavType.IntType },
-                    navArgument(Destinations.ARG_ROUND) { type = NavType.IntType },
-                ),
-            ) {
-                RaceDetailScreen(onBack = { navController.popBackStack() })
             }
         }
     }

@@ -8,30 +8,34 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.praval.f1calendar.core.PendingRaceSelection
+import com.praval.f1calendar.core.RaceKey
 import com.praval.f1calendar.ui.nav.F1NavHost
-import com.praval.f1calendar.ui.nav.RaceRef
 import com.praval.f1calendar.ui.theme.F1CalendarTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     /**
-     * Set when a session reminder is tapped. The nav host consumes it once and clears it, so
-     * rotating the device doesn't re-navigate.
+     * The Activity can't reach the calendar's ViewModel, so which race to open travels through this
+     * shared holder while navigation is handled separately by [showCalendarForAlarm].
      */
-    private var pendingRace by mutableStateOf<RaceRef?>(null)
+    @Inject lateinit var pendingRaceSelection: PendingRaceSelection
+
+    private var showCalendarForAlarm by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        pendingRace = intent.toRaceRef()
+        handleAlarmIntent(intent)
 
         setContent {
             F1CalendarTheme {
                 F1NavHost(
-                    pendingRace = pendingRace,
-                    onPendingRaceHandled = { pendingRace = null },
+                    showCalendarForAlarm = showCalendarForAlarm,
+                    onAlarmNavigationHandled = { showCalendarForAlarm = false },
                 )
             }
         }
@@ -41,13 +45,15 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        pendingRace = intent.toRaceRef()
+        handleAlarmIntent(intent)
     }
 
-    private fun Intent.toRaceRef(): RaceRef? {
-        val season = getIntExtra(EXTRA_OPEN_SEASON, 0)
-        val round = getIntExtra(EXTRA_OPEN_ROUND, 0)
-        return if (season > 0 && round > 0) RaceRef(season, round) else null
+    private fun handleAlarmIntent(intent: Intent) {
+        val season = intent.getIntExtra(EXTRA_OPEN_SEASON, 0)
+        val round = intent.getIntExtra(EXTRA_OPEN_ROUND, 0)
+        if (season <= 0 || round <= 0) return
+        pendingRaceSelection.request(RaceKey(season, round))
+        showCalendarForAlarm = true
     }
 
     companion object {
