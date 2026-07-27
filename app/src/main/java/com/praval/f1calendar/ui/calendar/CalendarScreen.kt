@@ -6,15 +6,23 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,12 +47,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.praval.f1calendar.domain.model.Race
 import com.praval.f1calendar.domain.model.SessionType
 import com.praval.f1calendar.ui.common.EmptyState
 import com.praval.f1calendar.ui.common.ErrorBanner
@@ -72,6 +83,7 @@ fun CalendarScreen(
     val zone = remember(state.useUtc) { displayZone(state.useUtc) }
     val context = LocalContext.current
 
+    var pickerExpanded by remember { mutableStateOf(false) }
     var pending by remember { mutableStateOf<PendingAlarm?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -132,12 +144,29 @@ fun CalendarScreen(
                 )
 
                 else -> {
-                    RaceWheelPicker(
-                        races = state.races,
-                        selectedRound = state.selectedRound,
-                        now = now,
-                        onSelect = viewModel::selectRound,
+                    // Collapsed by default so the round's own content owns the screen; the wheel is
+                    // only worth its height while you are actually choosing.
+                    SelectedRaceBar(
+                        race = state.selectedRace,
+                        expanded = pickerExpanded,
+                        onClick = { pickerExpanded = !pickerExpanded },
                     )
+                    AnimatedVisibility(
+                        visible = pickerExpanded,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
+                    ) {
+                        RaceWheelPicker(
+                            races = state.races,
+                            selectedRound = state.selectedRound,
+                            now = now,
+                            onSelect = viewModel::selectRound,
+                            onCommit = { round ->
+                                viewModel.selectRound(round)
+                                pickerExpanded = false
+                            },
+                        )
+                    }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                     PullToRefreshBox(
@@ -210,6 +239,56 @@ fun CalendarScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * The wheel's resting state: the chosen round on one line, tappable to open the picker. The chevron
+ * turns with the expansion so the control reads as a disclosure rather than a button.
+ */
+@Composable
+private fun SelectedRaceBar(
+    race: Race?,
+    expanded: Boolean,
+    onClick: () -> Unit,
+) {
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "picker-chevron",
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = race?.flag ?: "🏁",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = race?.let { "R${it.round}" }.orEmpty(),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = race?.name ?: "Choose a race",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            imageVector = Icons.Filled.ArrowDropDown,
+            contentDescription = if (expanded) "Close race picker" else "Open race picker",
+            modifier = Modifier.rotate(chevronRotation),
+        )
     }
 }
 

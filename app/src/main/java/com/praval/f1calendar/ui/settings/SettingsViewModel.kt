@@ -7,6 +7,7 @@ import com.praval.f1calendar.domain.model.Race
 import com.praval.f1calendar.domain.model.SessionAlarmRule
 import com.praval.f1calendar.domain.model.SessionType
 import com.praval.f1calendar.notifications.NotificationScheduler
+import com.praval.f1calendar.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,6 +19,7 @@ import java.time.Year
 import javax.inject.Inject
 
 data class SettingsUiState(
+    val appTheme: AppTheme = AppTheme.DEFAULT,
     val useUtc: Boolean = false,
     val remindersEnabled: Boolean = true,
     /** One entry per session type, defaults merged in. */
@@ -66,13 +68,18 @@ class SettingsViewModel @Inject constructor(
     private val nextAlarm = MutableStateFlow<NextAlarm?>(null)
 
     val uiState: StateFlow<SettingsUiState> = combine(
-        combine(settings.useUtc, settings.remindersEnabled) { utc, on -> utc to on },
+        combine(
+            settings.useUtc,
+            settings.remindersEnabled,
+            settings.appTheme,
+        ) { utc, on, theme -> Triple(utc, on, theme) },
         scheduler.observeRules(),
         scheduler.observeOverrideCount(),
         combine(settings.selectedSeason, settings.resolvedCurrentSeason) { a, b -> a to b },
         nextAlarm,
-    ) { (useUtc, remindersOn), rules, overrideCount, (selected, resolved), next ->
+    ) { (useUtc, remindersOn, theme), rules, overrideCount, (selected, resolved), next ->
         SettingsUiState(
+            appTheme = theme,
             useUtc = useUtc,
             remindersEnabled = remindersOn,
             rules = rules,
@@ -127,6 +134,10 @@ class SettingsViewModel @Inject constructor(
             scheduler.rescheduleAll()
             refreshNextAlarm()
         }
+    }
+
+    fun setAppTheme(theme: AppTheme) {
+        viewModelScope.launch { settings.setAppTheme(theme) }
     }
 
     fun setUseUtc(value: Boolean) {

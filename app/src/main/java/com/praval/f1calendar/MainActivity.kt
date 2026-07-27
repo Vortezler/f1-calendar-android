@@ -8,9 +8,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.praval.f1calendar.core.PendingRaceSelection
 import com.praval.f1calendar.core.RaceKey
+import com.praval.f1calendar.data.prefs.SettingsStore
 import com.praval.f1calendar.ui.nav.F1NavHost
+import com.praval.f1calendar.ui.theme.AppTheme
 import com.praval.f1calendar.ui.theme.F1CalendarTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -24,6 +27,8 @@ class MainActivity : ComponentActivity() {
      */
     @Inject lateinit var pendingRaceSelection: PendingRaceSelection
 
+    @Inject lateinit var settingsStore: SettingsStore
+
     private var showCalendarForAlarm by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,7 +37,10 @@ class MainActivity : ComponentActivity() {
         handleAlarmIntent(intent)
 
         setContent {
-            F1CalendarTheme {
+            // Read here rather than in a ViewModel: the theme wraps the whole tree, above any
+            // screen-scoped ViewModel that could supply it.
+            val appTheme by settingsStore.appTheme.collectAsStateWithLifecycle(AppTheme.DEFAULT)
+            F1CalendarTheme(appTheme = appTheme) {
                 F1NavHost(
                     showCalendarForAlarm = showCalendarForAlarm,
                     onAlarmNavigationHandled = { showCalendarForAlarm = false },

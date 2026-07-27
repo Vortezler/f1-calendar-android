@@ -85,10 +85,12 @@ app/
 
 ## The calendar screen
 
-The season is a **drum picker**: rows rotate about the X axis in proportion to their distance from
-the centre of the viewport, fading and shrinking with it, so the list reads as a physical wheel
-turning rather than a flat list scrolling. The transform runs in a deferred `graphicsLayer` block,
-so it is recalculated at draw time on every scroll frame without recomposing the rows.
+The screen rests on a single line naming the selected round. Tapping it opens a **drum picker**:
+rows rotate about the X axis in proportion to their distance from the centre of the viewport,
+fading and shrinking with it, so the list reads as a physical wheel turning rather than a flat list
+scrolling. The transform runs in a deferred `graphicsLayer` block, so it is recalculated at draw
+time on every scroll frame without recomposing the rows. Picking a round collapses it again, so the
+wheel only occupies the screen while it is actually being used.
 
 Selection is reported *continuously* while the wheel is still moving, so the page beneath tracks the
 spin. Network fetches for the selected round are debounced by 350 ms so scrolling past ten rounds
@@ -98,6 +100,17 @@ Everything about the chosen round lives on that one page: where and when, every 
 own alarm toggle and countdown, the race and qualifying classifications, and the drivers'
 championship. There is no separate race-detail page — a tapped alarm spins the wheel to that round
 instead of pushing a new screen.
+
+## Themes
+
+Settings offers seven accent palettes. Each is defined by a **single seed colour**; the full
+Material 3 light and dark schemes are derived from it by re-saturating and re-lightening that hue
+per colour role. Fixing saturation and value per role is what keeps contrast predictable across
+every theme — body text always lands near value 0.15 on a near-white surface in light mode, and the
+reverse in dark. Adding a theme is one line in `AppTheme`.
+
+Error colours stay red regardless of the accent: an error that matches the theme stops reading as
+an error.
 
 ## Alarms
 

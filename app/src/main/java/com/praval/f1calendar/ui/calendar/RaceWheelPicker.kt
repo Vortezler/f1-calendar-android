@@ -1,6 +1,7 @@
 package com.praval.f1calendar.ui.calendar
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.praval.f1calendar.domain.model.Race
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import java.time.Instant
 import kotlin.math.abs
 
@@ -52,12 +55,15 @@ fun RaceWheelPicker(
     selectedRound: Int?,
     now: Instant,
     onSelect: (Int) -> Unit,
+    /** Invoked when a row is tapped — a deliberate pick, as opposed to scrolling past. */
+    onCommit: (Int) -> Unit,
     modifier: Modifier = Modifier,
     visibleCount: Int = 5,
-    itemHeight: Dp = 46.dp,
+    itemHeight: Dp = 38.dp,
 ) {
     if (races.isEmpty()) return
 
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
     val itemHeightPx = with(LocalDensity.current) { itemHeight.toPx() }
@@ -113,6 +119,10 @@ fun RaceWheelPicker(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(itemHeight)
+                        .clickable {
+                            scope.launch { listState.animateScrollToItem(index) }
+                            onCommit(race.round)
+                        }
                         .graphicsLayer {
                             val info = listState.layoutInfo
                             val viewportCentre =

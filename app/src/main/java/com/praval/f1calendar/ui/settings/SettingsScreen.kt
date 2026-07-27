@@ -6,7 +6,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings as AndroidSettings
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,13 +20,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -46,7 +52,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -60,6 +70,7 @@ import com.praval.f1calendar.ui.common.SectionHeader
 import com.praval.f1calendar.ui.common.displayZone
 import com.praval.f1calendar.ui.common.formatDateTime
 import com.praval.f1calendar.ui.common.formatLeadTime
+import com.praval.f1calendar.ui.theme.AppTheme
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
@@ -97,6 +108,16 @@ fun SettingsScreen(
                 .padding(padding),
             contentPadding = PaddingValues(bottom = 32.dp),
         ) {
+            item { SectionHeader("Appearance") }
+
+            item {
+                ThemePicker(
+                    selected = state.appTheme,
+                    onSelect = viewModel::setAppTheme,
+                )
+            }
+
+            item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
             item { SectionHeader("Alarms") }
 
             item {
@@ -277,6 +298,68 @@ fun SettingsScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * Swatches rather than a list: the choice is entirely visual, so showing the colour is more use
+ * than showing its name. The selected one is named underneath for accessibility and confirmation.
+ */
+@Composable
+private fun ThemePicker(
+    selected: AppTheme,
+    onSelect: (AppTheme) -> Unit,
+) {
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AppTheme.entries.forEach { theme ->
+                val isSelected = theme == selected
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(theme.seed)
+                        .border(
+                            width = if (isSelected) 3.dp else 1.dp,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            },
+                            shape = CircleShape,
+                        )
+                        .selectable(
+                            selected = isSelected,
+                            onClick = { onSelect(theme) },
+                        )
+                        .semantics { contentDescription = theme.displayName },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = selected.displayName,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            text = "Light and dark variants follow your system setting.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
