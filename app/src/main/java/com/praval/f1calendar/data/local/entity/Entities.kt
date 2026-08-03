@@ -143,6 +143,40 @@ data class SessionRuleEntity(
     val leadMinutes: Int,
 )
 
+/** Every circuit that has ever held a championship grand prix, calendar or not. */
+@Entity(tableName = "circuits")
+data class CircuitEntity(
+    @PrimaryKey val circuitId: String,
+    val circuitName: String,
+    val locality: String?,
+    val country: String?,
+    val lat: Double?,
+    val lng: Double?,
+    val wikiUrl: String?,
+)
+
+/**
+ * The outright lap record for a circuit: the fastest lap ever set during a race there.
+ *
+ * A row exists only when a record is actually known. Circuits last raced before 2004 have no lap
+ * times in the dataset at all, so "looked up and found nothing" is recorded in `cache_meta`
+ * instead — the absence of a row here is not the same as never having checked.
+ */
+@Entity(tableName = "lap_records")
+data class LapRecordEntity(
+    @PrimaryKey val circuitId: String,
+    val timeText: String,
+    val millis: Long,
+    val driverId: String,
+    val givenName: String,
+    val familyName: String,
+    val driverCode: String?,
+    val constructorId: String,
+    val constructorName: String,
+    val season: Int,
+    val raceName: String,
+)
+
 /** Tracks when each remote resource was last fetched so refreshes can respect a TTL. */
 @Entity(tableName = "cache_meta")
 data class CacheMetaEntity(

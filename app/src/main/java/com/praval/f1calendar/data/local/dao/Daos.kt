@@ -8,7 +8,9 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import com.praval.f1calendar.data.local.entity.CacheMetaEntity
+import com.praval.f1calendar.data.local.entity.CircuitEntity
 import com.praval.f1calendar.data.local.entity.ConstructorStandingEntity
+import com.praval.f1calendar.data.local.entity.LapRecordEntity
 import com.praval.f1calendar.data.local.entity.DriverStandingEntity
 import com.praval.f1calendar.data.local.entity.QualifyingResultEntity
 import com.praval.f1calendar.data.local.entity.RaceEntity
@@ -178,6 +180,31 @@ interface SessionRuleDao {
 
     @Query("DELETE FROM session_rules")
     suspend fun clear()
+}
+
+@Dao
+interface RecordsDao {
+
+    @Query("SELECT * FROM circuits ORDER BY circuitName ASC")
+    fun observeCircuits(): Flow<List<CircuitEntity>>
+
+    @Query("SELECT COUNT(*) FROM circuits")
+    suspend fun countCircuits(): Int
+
+    @Query("SELECT circuitId FROM circuits ORDER BY circuitName ASC")
+    suspend fun circuitIds(): List<String>
+
+    @Upsert
+    suspend fun upsertCircuits(circuits: List<CircuitEntity>)
+
+    @Query("SELECT * FROM lap_records")
+    fun observeRecords(): Flow<List<LapRecordEntity>>
+
+    @Upsert
+    suspend fun upsertRecord(record: LapRecordEntity)
+
+    @Query("DELETE FROM lap_records WHERE circuitId = :circuitId")
+    suspend fun deleteRecord(circuitId: String)
 }
 
 @Dao

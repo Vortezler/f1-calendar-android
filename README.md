@@ -79,7 +79,7 @@ app/
     repository/   RaceRepository, StandingsRepository
   domain/model/   Race, sessions, results, standings, alarm rules, live timing
   notifications/  scheduler, alarm receiver, boot receiver, sync worker
-  ui/             calendar, live, standings, settings, nav, theme, common
+  ui/             calendar, live, records, standings, settings, nav, theme, common
   di/             Hilt modules
 ```
 
@@ -100,6 +100,25 @@ Everything about the chosen round lives on that one page: where and when, every 
 own alarm toggle and countdown, the race and qualifying classifications, and the drivers'
 championship. There is no separate race-detail page — a tapped alarm spins the wheel to that round
 instead of pushing a new screen.
+
+## Lap records
+
+The Records tab lists the outright lap record for **every circuit the championship has ever
+visited**, not only those on a calendar — 78 of them.
+
+There is no bulk records endpoint. `circuits/{id}/fastest/1/results.json` returns every race at a
+circuit filtered to whoever set that race's fastest lap, so a circuit's record is the minimum of one
+request's worth of data — but that is one request per circuit. They are fetched once, spaced ~260 ms
+apart to stay inside the API's rate limit, with visible progress, then cached for a week; a lap
+record only changes when a race is actually held there. Three consecutive failures abort the sweep
+rather than hammering a rate-limited API.
+
+Two caveats are surfaced in the UI rather than hidden:
+
+- The outright record is the fastest lap set **during a race**. Quicker qualifying laps don't count.
+- Ergast only carries lap *times* from **2004** onward. Earlier races come back naming a fastest-lap
+  holder with no time attached; those are discarded, so a circuit last used before 2004 correctly
+  shows no record instead of an absurd one.
 
 ## Themes
 

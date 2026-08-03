@@ -1,19 +1,25 @@
 package com.praval.f1calendar.data.mapper
 
+import com.praval.f1calendar.core.LapTime
+import com.praval.f1calendar.data.local.entity.CircuitEntity
 import com.praval.f1calendar.data.local.entity.ConstructorStandingEntity
+import com.praval.f1calendar.data.local.entity.LapRecordEntity
 import com.praval.f1calendar.data.local.entity.DriverStandingEntity
 import com.praval.f1calendar.data.local.entity.QualifyingResultEntity
 import com.praval.f1calendar.data.local.entity.RaceEntity
 import com.praval.f1calendar.data.local.entity.RaceResultEntity
+import com.praval.f1calendar.data.remote.dto.CircuitDto
 import com.praval.f1calendar.data.remote.dto.ConstructorStandingDto
 import com.praval.f1calendar.data.remote.dto.DriverStandingDto
 import com.praval.f1calendar.data.remote.dto.QualifyingResultDto
 import com.praval.f1calendar.data.remote.dto.RaceDto
 import com.praval.f1calendar.data.remote.dto.ResultDto
 import com.praval.f1calendar.data.remote.dto.SessionDto
+import com.praval.f1calendar.domain.model.Circuit
 import com.praval.f1calendar.domain.model.ConstructorStanding
 import com.praval.f1calendar.domain.model.Driver
 import com.praval.f1calendar.domain.model.DriverStanding
+import com.praval.f1calendar.domain.model.LapRecord
 import com.praval.f1calendar.domain.model.QualifyingResult
 import com.praval.f1calendar.domain.model.Race
 import com.praval.f1calendar.domain.model.RaceResult
@@ -143,6 +149,42 @@ fun ConstructorStandingDto.toEntityOrNull(season: Int): ConstructorStandingEntit
     )
 }
 
+fun CircuitDto.toEntity(): CircuitEntity = CircuitEntity(
+    circuitId = circuitId,
+    circuitName = circuitName,
+    locality = location?.locality,
+    country = location?.country,
+    lat = location?.lat?.toDoubleOrNull(),
+    lng = location?.long?.toDoubleOrNull(),
+    wikiUrl = url,
+)
+
+/**
+ * Reduces a circuit's fastest-lap history to its outright record.
+ *
+ * Races before 2004 name a fastest-lap holder but carry no time, so they are discarded rather than
+ * treated as an unbeatable zero.
+ */
+fun List<RaceDto>.toLapRecordOrNull(circuitId: String): LapRecordEntity? =
+    mapNotNull { race ->
+        val result = race.results?.firstOrNull() ?: return@mapNotNull null
+        val timeText = result.fastestLap?.time?.time ?: return@mapNotNull null
+        val millis = LapTime.parseMillis(timeText) ?: return@mapNotNull null
+        LapRecordEntity(
+            circuitId = circuitId,
+            timeText = timeText,
+            millis = millis,
+            driverId = result.driver.driverId,
+            givenName = result.driver.givenName,
+            familyName = result.driver.familyName,
+            driverCode = result.driver.code,
+            constructorId = result.team.constructorId,
+            constructorName = result.team.name,
+            season = race.season.toIntOrNull() ?: 0,
+            raceName = race.raceName,
+        )
+    }.minByOrNull { it.millis }
+
 // endregion
 
 // region local -> domain
@@ -208,6 +250,27 @@ fun DriverStandingEntity.toDomain(): DriverStanding {
         wins = wins,
     )
 }
+
+fun CircuitEntity.toDomain(): Circuit = Circuit(
+    id = circuitId,
+    name = circuitName,
+    locality = locality,
+    country = country,
+    wikiUrl = wikiUrl,
+)
+
+fun LapRecordEntity.toDomain(): LapRecord = LapRecord(
+    circuitId = circuitId,
+    time = timeText,
+    millis = millis,
+    driverId = driverId,
+    driverName = "$givenName $familyName",
+    driverCode = driverCode,
+    teamId = constructorId,
+    teamName = constructorName,
+    season = season,
+    raceName = raceName,
+)
 
 fun ConstructorStandingEntity.toDomain(): ConstructorStanding = ConstructorStanding(
     position = position,

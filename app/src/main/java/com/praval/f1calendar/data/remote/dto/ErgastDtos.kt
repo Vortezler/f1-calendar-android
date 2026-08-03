@@ -133,6 +133,22 @@ data class RaceResponse(
 )
 
 @Serializable
+data class CircuitTableDto(
+    @SerialName("Circuits") val circuits: List<CircuitDto> = emptyList(),
+)
+
+@Serializable
+data class CircuitsMRData(
+    val total: String? = null,
+    @SerialName("CircuitTable") val circuitTable: CircuitTableDto,
+)
+
+@Serializable
+data class CircuitsResponse(
+    @SerialName("MRData") val data: CircuitsMRData,
+)
+
+@Serializable
 data class DriverStandingDto(
     val position: String? = null,
     val positionText: String? = null,

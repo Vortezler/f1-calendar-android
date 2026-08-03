@@ -1,5 +1,6 @@
 package com.praval.f1calendar.data.remote
 
+import com.praval.f1calendar.data.remote.dto.CircuitsResponse
 import com.praval.f1calendar.data.remote.dto.RaceResponse
 import com.praval.f1calendar.data.remote.dto.StandingsResponse
 import retrofit2.http.GET
@@ -34,6 +35,26 @@ interface ErgastApi {
     suspend fun qualifyingResults(
         @Path("season") season: String,
         @Path("round") round: Int,
+        @Query("limit") limit: Int = 100,
+    ): RaceResponse
+
+    /** Every circuit in the championship's history — 78 of them, so one page covers it. */
+    @GET("circuits.json")
+    suspend fun circuits(
+        @Query("limit") limit: Int = 100,
+        @Query("offset") offset: Int = 0,
+    ): CircuitsResponse
+
+    /**
+     * Every race at a circuit, filtered to whoever set that race's fastest lap.
+     *
+     * One request yields a circuit's entire fastest-lap history, from which the outright record is
+     * simply the minimum. Note that Ergast only carries lap *times* from 2004 onward — earlier
+     * races come back naming a fastest-lap holder but with no time attached, and must be discarded.
+     */
+    @GET("circuits/{circuitId}/fastest/1/results.json")
+    suspend fun circuitFastestLaps(
+        @Path("circuitId") circuitId: String,
         @Query("limit") limit: Int = 100,
     ): RaceResponse
 

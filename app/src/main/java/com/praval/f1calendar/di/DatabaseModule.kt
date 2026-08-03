@@ -6,6 +6,7 @@ import com.praval.f1calendar.data.local.F1Database
 import com.praval.f1calendar.data.local.dao.CacheDao
 import com.praval.f1calendar.data.local.dao.RaceDao
 import com.praval.f1calendar.data.local.dao.ReminderDao
+import com.praval.f1calendar.data.local.dao.RecordsDao
 import com.praval.f1calendar.data.local.dao.ResultDao
 import com.praval.f1calendar.data.local.dao.SessionRuleDao
 import com.praval.f1calendar.data.local.dao.StandingsDao
@@ -24,8 +25,9 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): F1Database =
         Room.databaseBuilder(context, F1Database::class.java, F1Database.NAME)
-            // Everything here except `reminders` is a rebuildable cache. Once a schema change ships
-            // that touches reminders, replace this with a real Migration.
+            .addMigrations(F1Database.MIGRATION_2_3)
+            // Backstop only. Real migrations are written for anything that would otherwise discard
+            // the user's alarm rules; this catches upgrades from schemas that predate them.
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 
@@ -43,6 +45,9 @@ object DatabaseModule {
 
     @Provides
     fun provideSessionRuleDao(db: F1Database): SessionRuleDao = db.sessionRuleDao()
+
+    @Provides
+    fun provideRecordsDao(db: F1Database): RecordsDao = db.recordsDao()
 
     @Provides
     fun provideCacheDao(db: F1Database): CacheDao = db.cacheDao()

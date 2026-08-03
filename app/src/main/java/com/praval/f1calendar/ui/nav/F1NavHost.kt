@@ -17,6 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
+import com.praval.f1calendar.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -27,19 +29,35 @@ import androidx.navigation.compose.rememberNavController
 import com.praval.f1calendar.ui.calendar.CalendarScreen
 import com.praval.f1calendar.ui.live.LiveScreen
 import com.praval.f1calendar.ui.live.LiveTabViewModel
+import com.praval.f1calendar.ui.records.RecordsScreen
 import com.praval.f1calendar.ui.settings.SettingsScreen
 import com.praval.f1calendar.ui.standings.StandingsScreen
 
+/**
+ * The icon is a composable rather than an [ImageVector] because one tab uses a locally drawn
+ * vector, which can only be resolved during composition.
+ */
 private data class TopLevelItem(
     val route: String,
     val label: String,
-    val icon: ImageVector,
+    val icon: @Composable () -> Unit,
 )
 
-private val calendarItem = TopLevelItem(Destinations.CALENDAR, "Calendar", Icons.Filled.DateRange)
-private val liveItem = TopLevelItem(Destinations.LIVE, "Live", Icons.Filled.PlayArrow)
-private val standingsItem = TopLevelItem(Destinations.STANDINGS, "Standings", Icons.Filled.Star)
-private val settingsItem = TopLevelItem(Destinations.SETTINGS, "Settings", Icons.Filled.Settings)
+private val calendarItem = TopLevelItem(Destinations.CALENDAR, "Calendar") {
+    Icon(Icons.Filled.DateRange, contentDescription = null)
+}
+private val liveItem = TopLevelItem(Destinations.LIVE, "Live") {
+    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+}
+private val recordsItem = TopLevelItem(Destinations.RECORDS, "Records") {
+    Icon(ImageVector.vectorResource(R.drawable.ic_stopwatch), contentDescription = null)
+}
+private val standingsItem = TopLevelItem(Destinations.STANDINGS, "Standings") {
+    Icon(Icons.Filled.Star, contentDescription = null)
+}
+private val settingsItem = TopLevelItem(Destinations.SETTINGS, "Settings") {
+    Icon(Icons.Filled.Settings, contentDescription = null)
+}
 
 @Composable
 fun F1NavHost(
@@ -59,6 +77,7 @@ fun F1NavHost(
         buildList {
             add(calendarItem)
             if (liveVisible) add(liveItem)
+            add(recordsItem)
             add(standingsItem)
             add(settingsItem)
         }
@@ -105,7 +124,7 @@ fun F1NavHost(
                                     restoreState = true
                                 }
                             },
-                            icon = { Icon(item.icon, contentDescription = null) },
+                            icon = item.icon,
                             label = { Text(item.label) },
                         )
                     }
@@ -126,6 +145,9 @@ fun F1NavHost(
             }
             composable(Destinations.LIVE) {
                 LiveScreen()
+            }
+            composable(Destinations.RECORDS) {
+                RecordsScreen()
             }
             composable(Destinations.STANDINGS) {
                 StandingsScreen()
