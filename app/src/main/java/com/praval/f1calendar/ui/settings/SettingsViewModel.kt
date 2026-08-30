@@ -4,9 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.praval.f1calendar.data.prefs.SettingsStore
 import com.praval.f1calendar.domain.model.Race
+import com.praval.f1calendar.domain.model.ResultNotificationRule
 import com.praval.f1calendar.domain.model.SessionAlarmRule
 import com.praval.f1calendar.domain.model.SessionType
 import com.praval.f1calendar.notifications.NotificationScheduler
+import com.praval.f1calendar.notifications.SessionResultScheduler
 import com.praval.f1calendar.ui.theme.AppTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +28,8 @@ data class SettingsUiState(
     val rules: Map<SessionType, SessionAlarmRule> = emptyMap(),
     /** How many individual weekends deviate from the standing rules. */
     val overrideCount: Int = 0,
+    /** One entry per session type, defaults merged in. */
+    val resultRules: Map<SessionType, ResultNotificationRule> = emptyMap(),
     val selectedSeason: Int = SettingsStore.FOLLOW_CURRENT,
     val resolvedCurrentSeason: Int = 0,
     val nextAlarm: NextAlarm? = null,
@@ -48,6 +52,9 @@ data class SettingsUiState(
 
     val armedCount: Int get() = rules.values.count { it.enabled }
 
+    val orderedResultRules: List<ResultNotificationRule>
+        get() = SessionType.entries.mapNotNull { resultRules[it] }
+
     private companion object {
         const val FIRST_SEASON = 1950
     }
@@ -59,6 +66,7 @@ data class NextAlarm(val race: Race, val type: SessionType)
 class SettingsViewModel @Inject constructor(
     private val settings: SettingsStore,
     private val scheduler: NotificationScheduler,
+    private val resultScheduler: SessionResultScheduler,
 ) : ViewModel() {
 
     /**
@@ -76,14 +84,15 @@ class SettingsViewModel @Inject constructor(
         scheduler.observeRules(),
         scheduler.observeOverrideCount(),
         combine(settings.selectedSeason, settings.resolvedCurrentSeason) { a, b -> a to b },
-        nextAlarm,
-    ) { (useUtc, remindersOn, theme), rules, overrideCount, (selected, resolved), next ->
+        combine(nextAlarm, resultScheduler.observeRules()) { next, resultRules -> next to resultRules },
+    ) { (useUtc, remindersOn, theme), rules, overrideCount, (selected, resolved), (next, resultRules) ->
         SettingsUiState(
             appTheme = theme,
             useUtc = useUtc,
             remindersEnabled = remindersOn,
             rules = rules,
             overrideCount = overrideCount,
+            resultRules = resultRules,
             selectedSeason = selected,
             resolvedCurrentSeason = resolved,
             nextAlarm = next,
@@ -126,6 +135,10 @@ class SettingsViewModel @Inject constructor(
             scheduler.clearAllOverrides()
             refreshNextAlarm()
         }
+    }
+
+    fun setResultRuleEnabled(type: SessionType, enabled: Boolean) {
+        viewModelScope.launch { resultScheduler.setRuleEnabled(type, enabled) }
     }
 
     fun setRemindersEnabled(value: Boolean) {

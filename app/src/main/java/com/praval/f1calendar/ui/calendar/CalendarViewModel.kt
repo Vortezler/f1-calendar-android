@@ -14,6 +14,7 @@ import com.praval.f1calendar.domain.model.RaceResult
 import com.praval.f1calendar.domain.model.SessionAlarmRule
 import com.praval.f1calendar.domain.model.SessionType
 import com.praval.f1calendar.notifications.NotificationScheduler
+import com.praval.f1calendar.notifications.SessionResultScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -94,6 +95,7 @@ class CalendarViewModel @Inject constructor(
     private val raceRepository: RaceRepository,
     private val standingsRepository: StandingsRepository,
     private val scheduler: NotificationScheduler,
+    private val resultScheduler: SessionResultScheduler,
     private val pendingRaceSelection: PendingRaceSelection,
     private val settings: SettingsStore,
 ) : ViewModel() {
@@ -288,6 +290,10 @@ class CalendarViewModel @Inject constructor(
                 error = (result as? Res.Error)?.message,
             )
         }
+        // Alarms otherwise only rebuild from the daily sync worker or a manual toggle, so a fresh
+        // install (or a schedule change) could sit unarmed for hours before anything notices.
+        scheduler.rescheduleAll()
+        resultScheduler.rescheduleAll()
     }
 
     private suspend fun loadStandings(season: Int, force: Boolean) {

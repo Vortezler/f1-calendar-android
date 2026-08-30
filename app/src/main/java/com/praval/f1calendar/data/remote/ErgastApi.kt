@@ -38,6 +38,13 @@ interface ErgastApi {
         @Query("limit") limit: Int = 100,
     ): RaceResponse
 
+    @GET("{season}/{round}/sprint.json")
+    suspend fun sprintResults(
+        @Path("season") season: String,
+        @Path("round") round: Int,
+        @Query("limit") limit: Int = 100,
+    ): RaceResponse
+
     /** Every circuit in the championship's history — 78 of them, so one page covers it. */
     @GET("circuits.json")
     suspend fun circuits(

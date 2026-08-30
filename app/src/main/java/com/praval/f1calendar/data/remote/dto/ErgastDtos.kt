@@ -110,6 +110,7 @@ data class RaceDto(
     @SerialName("SprintShootout") val sprintShootout: SessionDto? = null,
     @SerialName("Results") val results: List<ResultDto>? = null,
     @SerialName("QualifyingResults") val qualifyingResults: List<QualifyingResultDto>? = null,
+    @SerialName("SprintResults") val sprintResults: List<ResultDto>? = null,
 )
 
 @Serializable

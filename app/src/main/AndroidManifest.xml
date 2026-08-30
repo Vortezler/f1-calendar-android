@@ -37,6 +37,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".notifications.SessionResultReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".notifications.BootReceiver"
             android:exported="true">
             <intent-filter>

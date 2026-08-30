@@ -64,6 +64,7 @@ import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.praval.f1calendar.domain.model.DefaultAlarmRules
+import com.praval.f1calendar.domain.model.ResultNotificationRule
 import com.praval.f1calendar.domain.model.SessionAlarmRule
 import com.praval.f1calendar.domain.model.SessionType
 import com.praval.f1calendar.ui.common.SectionHeader
@@ -244,6 +245,23 @@ fun SettingsScreen(
             }
 
             item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
+            item { SectionHeader("Session results") }
+            item {
+                Text(
+                    text = "Get notified as soon as a session's results are in.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp),
+                )
+            }
+            items(state.orderedResultRules, key = { "result-${it.type.name}" }) { rule ->
+                ResultRuleRow(
+                    rule = rule,
+                    onToggle = { viewModel.setResultRuleEnabled(rule.type, it) },
+                )
+            }
+
+            item { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
             item { SectionHeader("Times") }
 
             item {
@@ -395,6 +413,26 @@ private fun SessionRuleRow(
             onCheckedChange = onToggle,
             enabled = enabled,
         )
+    }
+}
+
+@Composable
+private fun ResultRuleRow(
+    rule: ResultNotificationRule,
+    onToggle: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = rule.type.label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(checked = rule.enabled, onCheckedChange = onToggle)
     }
 }
 

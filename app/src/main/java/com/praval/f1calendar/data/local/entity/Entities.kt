@@ -177,6 +177,19 @@ data class LapRecordEntity(
     val raceName: String,
 )
 
+/**
+ * The standing rule for whether a session type's results raise a notification once it finishes.
+ *
+ * Absent rows fall back to [com.praval.f1calendar.domain.model.DefaultResultRules], so the table
+ * only ever holds what the user actually changed.
+ */
+@Entity(tableName = "result_rules")
+data class ResultRuleEntity(
+    /** [com.praval.f1calendar.domain.model.SessionType] name. */
+    @PrimaryKey val session: String,
+    val enabled: Boolean,
+)
+
 /** Tracks when each remote resource was last fetched so refreshes can respect a TTL. */
 @Entity(tableName = "cache_meta")
 data class CacheMetaEntity(

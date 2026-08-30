@@ -8,6 +8,7 @@ import com.praval.f1calendar.data.local.dao.RaceDao
 import com.praval.f1calendar.data.local.dao.ReminderDao
 import com.praval.f1calendar.data.local.dao.RecordsDao
 import com.praval.f1calendar.data.local.dao.ResultDao
+import com.praval.f1calendar.data.local.dao.ResultRuleDao
 import com.praval.f1calendar.data.local.dao.SessionRuleDao
 import com.praval.f1calendar.data.local.dao.StandingsDao
 import dagger.Module
@@ -25,7 +26,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): F1Database =
         Room.databaseBuilder(context, F1Database::class.java, F1Database.NAME)
-            .addMigrations(F1Database.MIGRATION_2_3)
+            .addMigrations(F1Database.MIGRATION_2_3, F1Database.MIGRATION_3_4)
             // Backstop only. Real migrations are written for anything that would otherwise discard
             // the user's alarm rules; this catches upgrades from schemas that predate them.
             .fallbackToDestructiveMigration(dropAllTables = true)
@@ -48,6 +49,9 @@ object DatabaseModule {
 
     @Provides
     fun provideRecordsDao(db: F1Database): RecordsDao = db.recordsDao()
+
+    @Provides
+    fun provideResultRuleDao(db: F1Database): ResultRuleDao = db.resultRuleDao()
 
     @Provides
     fun provideCacheDao(db: F1Database): CacheDao = db.cacheDao()

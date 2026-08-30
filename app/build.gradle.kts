@@ -17,8 +17,8 @@ android {
         applicationId = "com.praval.f1calendar"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
 
         // Room exports the schema so migrations can be diffed later.
         ksp { arg("room.schemaLocation", "$projectDir/schemas") }

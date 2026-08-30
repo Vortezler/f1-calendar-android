@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "a97882882b0374ff9d59b7ba82590549",
+    "identityHash": "d2f6b999de020b0dbca137e6586a75d6",
     "entities": [
       {
         "tableName": "races",
@@ -553,128 +553,26 @@
         }
       },
       {
-        "tableName": "circuits",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`circuitId` TEXT NOT NULL, `circuitName` TEXT NOT NULL, `locality` TEXT, `country` TEXT, `lat` REAL, `lng` REAL, `wikiUrl` TEXT, PRIMARY KEY(`circuitId`))",
+        "tableName": "result_rules",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`session` TEXT NOT NULL, `enabled` INTEGER NOT NULL, PRIMARY KEY(`session`))",
         "fields": [
           {
-            "fieldPath": "circuitId",
-            "columnName": "circuitId",
+            "fieldPath": "session",
+            "columnName": "session",
             "affinity": "TEXT",
             "notNull": true
           },
           {
-            "fieldPath": "circuitName",
-            "columnName": "circuitName",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "locality",
-            "columnName": "locality",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "country",
-            "columnName": "country",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "lat",
-            "columnName": "lat",
-            "affinity": "REAL"
-          },
-          {
-            "fieldPath": "lng",
-            "columnName": "lng",
-            "affinity": "REAL"
-          },
-          {
-            "fieldPath": "wikiUrl",
-            "columnName": "wikiUrl",
-            "affinity": "TEXT"
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": [
-            "circuitId"
-          ]
-        }
-      },
-      {
-        "tableName": "lap_records",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`circuitId` TEXT NOT NULL, `timeText` TEXT NOT NULL, `millis` INTEGER NOT NULL, `driverId` TEXT NOT NULL, `givenName` TEXT NOT NULL, `familyName` TEXT NOT NULL, `driverCode` TEXT, `constructorId` TEXT NOT NULL, `constructorName` TEXT NOT NULL, `season` INTEGER NOT NULL, `raceName` TEXT NOT NULL, PRIMARY KEY(`circuitId`))",
-        "fields": [
-          {
-            "fieldPath": "circuitId",
-            "columnName": "circuitId",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "timeText",
-            "columnName": "timeText",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "millis",
-            "columnName": "millis",
+            "fieldPath": "enabled",
+            "columnName": "enabled",
             "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "driverId",
-            "columnName": "driverId",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "givenName",
-            "columnName": "givenName",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "familyName",
-            "columnName": "familyName",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "driverCode",
-            "columnName": "driverCode",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "constructorId",
-            "columnName": "constructorId",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "constructorName",
-            "columnName": "constructorName",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "season",
-            "columnName": "season",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "raceName",
-            "columnName": "raceName",
-            "affinity": "TEXT",
             "notNull": true
           }
         ],
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
-            "circuitId"
+            "session"
           ]
         }
       },
@@ -705,7 +603,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a97882882b0374ff9d59b7ba82590549')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd2f6b999de020b0dbca137e6586a75d6')"
     ]
   }
 }

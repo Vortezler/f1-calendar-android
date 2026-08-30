@@ -12,6 +12,7 @@ import com.praval.f1calendar.data.local.dao.CacheDao
 import com.praval.f1calendar.data.local.dao.RaceDao
 import com.praval.f1calendar.data.local.dao.ReminderDao
 import com.praval.f1calendar.data.local.dao.ResultDao
+import com.praval.f1calendar.data.local.dao.ResultRuleDao
 import com.praval.f1calendar.data.local.dao.SessionRuleDao
 import com.praval.f1calendar.data.local.dao.StandingsDao
 import com.praval.f1calendar.data.local.entity.CacheMetaEntity
@@ -21,6 +22,7 @@ import com.praval.f1calendar.data.local.entity.QualifyingResultEntity
 import com.praval.f1calendar.data.local.entity.RaceEntity
 import com.praval.f1calendar.data.local.entity.RaceResultEntity
 import com.praval.f1calendar.data.local.entity.ReminderEntity
+import com.praval.f1calendar.data.local.entity.ResultRuleEntity
 import com.praval.f1calendar.data.local.entity.SessionRuleEntity
 
 @Database(
@@ -34,12 +36,14 @@ import com.praval.f1calendar.data.local.entity.SessionRuleEntity
         SessionRuleEntity::class,
         CircuitEntity::class,
         LapRecordEntity::class,
+        ResultRuleEntity::class,
         CacheMetaEntity::class,
     ],
     // v2 added session_rules and ReminderEntity.enabled.
-    // v3 adds circuits and lap_records, migrated properly rather than destructively so alarm
-    // preferences survive the upgrade.
-    version = 3,
+    // v3 added circuits and lap_records.
+    // v4 adds result_rules. All migrated properly rather than destructively so alarm and
+    // notification preferences survive the upgrade.
+    version = 4,
     exportSchema = true,
 )
 abstract class F1Database : RoomDatabase() {
@@ -49,6 +53,7 @@ abstract class F1Database : RoomDatabase() {
     abstract fun reminderDao(): ReminderDao
     abstract fun sessionRuleDao(): SessionRuleDao
     abstract fun recordsDao(): RecordsDao
+    abstract fun resultRuleDao(): ResultRuleDao
     abstract fun cacheDao(): CacheDao
 
     companion object {
@@ -86,6 +91,18 @@ abstract class F1Database : RoomDatabase() {
                         "`season` INTEGER NOT NULL, " +
                         "`raceName` TEXT NOT NULL, " +
                         "PRIMARY KEY(`circuitId`))",
+                )
+            }
+        }
+
+        /** Purely additive: one new table, nothing existing touched. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `result_rules` (" +
+                        "`session` TEXT NOT NULL, " +
+                        "`enabled` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`session`))",
                 )
             }
         }

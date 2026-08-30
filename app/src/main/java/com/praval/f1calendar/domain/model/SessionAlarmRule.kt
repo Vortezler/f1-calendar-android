@@ -34,3 +34,21 @@ object DefaultAlarmRules {
 
     fun all(): List<SessionAlarmRule> = SessionType.entries.map(::forType)
 }
+
+/**
+ * Whether a session's results should raise a notification as soon as they're available. Unlike
+ * [SessionAlarmRule] there is no lead time to configure — it fires once, right after the session
+ * (or the app's best estimate of when it) ends.
+ */
+data class ResultNotificationRule(
+    val type: SessionType,
+    val enabled: Boolean,
+)
+
+object DefaultResultRules {
+
+    /** On by default for every session type, including practice — the user can quiet what they don't want. */
+    fun forType(type: SessionType): ResultNotificationRule = ResultNotificationRule(type, enabled = true)
+
+    fun all(): List<ResultNotificationRule> = SessionType.entries.map(::forType)
+}

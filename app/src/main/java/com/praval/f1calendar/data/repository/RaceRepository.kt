@@ -120,6 +120,19 @@ class RaceRepository @Inject constructor(
     }
 
     /**
+     * Sprint classification, for the results notification only — unlike [refreshResults] and
+     * [refreshQualifying] this never touches Room, since nothing else in the app displays a sprint
+     * classification yet.
+     */
+    suspend fun fetchSprintResults(season: Int, round: Int): Res<List<RaceResult>> =
+        apiCall { api.sprintResults(season.toString(), round) }.map { response ->
+            response.data.raceTable.races.firstOrNull()?.sprintResults.orEmpty()
+                .mapNotNull { it.toEntityOrNull(season, round) }
+                .sortedBy { it.position }
+                .map { it.toDomain() }
+        }
+
+    /**
      * Classifications are provisional for a few hours after the flag while stewards' decisions land,
      * but a day later they are final and never need refetching.
      */

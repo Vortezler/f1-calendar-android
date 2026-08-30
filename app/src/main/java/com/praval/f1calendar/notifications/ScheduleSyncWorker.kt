@@ -29,6 +29,7 @@ class ScheduleSyncWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val raceRepository: RaceRepository,
     private val scheduler: NotificationScheduler,
+    private val resultScheduler: SessionResultScheduler,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
@@ -38,6 +39,7 @@ class ScheduleSyncWorker @AssistedInject constructor(
             return if (runAttemptCount < MAX_ATTEMPTS) Result.retry() else Result.failure()
         }
         scheduler.rescheduleAll()
+        resultScheduler.rescheduleAll()
         return Result.success()
     }
 

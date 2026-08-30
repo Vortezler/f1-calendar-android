@@ -3,4 +3,6 @@
     <string name="app_name">F1 Calendar</string>
     <string name="channel_sessions_name">Session reminders</string>
     <string name="channel_sessions_description">Alerts shortly before a practice, qualifying or race session starts.</string>
+    <string name="channel_results_name">Session results</string>
+    <string name="channel_results_description">Alerts as soon as a session\'s results are available.</string>
 </resources>

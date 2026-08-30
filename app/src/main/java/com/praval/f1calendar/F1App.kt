@@ -22,21 +22,29 @@ class F1App : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        createNotificationChannels()
         // KEEP policy, so this is a no-op once the job already exists.
         ScheduleSyncWorker.enqueuePeriodic(this)
     }
 
     // minSdk is 26, so notification channels are always available — no version guard needed.
-    private fun createNotificationChannel() {
+    private fun createNotificationChannels() {
         val manager = getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(
+        val sessions = NotificationChannel(
             NotificationIds.CHANNEL_SESSIONS,
             getString(R.string.channel_sessions_name),
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
             description = getString(R.string.channel_sessions_description)
         }
-        manager.createNotificationChannel(channel)
+        val results = NotificationChannel(
+            NotificationIds.CHANNEL_RESULTS,
+            getString(R.string.channel_results_name),
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = getString(R.string.channel_results_description)
+        }
+        manager.createNotificationChannel(sessions)
+        manager.createNotificationChannel(results)
     }
 }

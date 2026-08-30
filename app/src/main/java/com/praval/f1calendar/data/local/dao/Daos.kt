@@ -16,6 +16,7 @@ import com.praval.f1calendar.data.local.entity.QualifyingResultEntity
 import com.praval.f1calendar.data.local.entity.RaceEntity
 import com.praval.f1calendar.data.local.entity.RaceResultEntity
 import com.praval.f1calendar.data.local.entity.ReminderEntity
+import com.praval.f1calendar.data.local.entity.ResultRuleEntity
 import com.praval.f1calendar.data.local.entity.SessionRuleEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -205,6 +206,22 @@ interface RecordsDao {
 
     @Query("DELETE FROM lap_records WHERE circuitId = :circuitId")
     suspend fun deleteRecord(circuitId: String)
+}
+
+@Dao
+interface ResultRuleDao {
+
+    @Query("SELECT * FROM result_rules")
+    fun observeAll(): Flow<List<ResultRuleEntity>>
+
+    @Query("SELECT * FROM result_rules")
+    suspend fun getAll(): List<ResultRuleEntity>
+
+    @Upsert
+    suspend fun upsert(rule: ResultRuleEntity)
+
+    @Query("DELETE FROM result_rules")
+    suspend fun clear()
 }
 
 @Dao
