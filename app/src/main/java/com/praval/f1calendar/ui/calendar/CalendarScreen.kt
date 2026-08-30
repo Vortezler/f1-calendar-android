@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -203,7 +204,10 @@ fun CalendarScreen(
                                     },
                                 )
 
-                                sessionsSection(
+                                // A weekend that's already run is read for its results first; one
+                                // that's still to come is read for when things start, so the
+                                // session times move to the top or bottom of the page to match.
+                                fun LazyListScope.sessions() = sessionsSection(
                                     race = race,
                                     now = now,
                                     zone = zone,
@@ -217,6 +221,8 @@ fun CalendarScreen(
                                     },
                                 )
 
+                                if (!race.isCompleted(now)) sessions()
+
                                 resultsSection(
                                     results = state.results,
                                     race = race,
@@ -228,6 +234,8 @@ fun CalendarScreen(
                                     race = race,
                                     now = now,
                                 )
+
+                                if (race.isCompleted(now)) sessions()
 
                                 driverStandingsSection(
                                     standings = state.driverStandings,

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
@@ -38,6 +37,7 @@ import com.praval.f1calendar.domain.model.RaceResult
 import com.praval.f1calendar.domain.model.RaceSession
 import com.praval.f1calendar.domain.model.SessionType
 import com.praval.f1calendar.ui.common.PositionBadge
+import com.praval.f1calendar.ui.common.SectionCard
 import com.praval.f1calendar.ui.common.SectionHeader
 import com.praval.f1calendar.ui.common.TeamAccent
 import com.praval.f1calendar.ui.common.formatCountdown
@@ -70,9 +70,11 @@ fun LazyListScope.raceHeaderItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         ) {
             Column(Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.Top) {
@@ -173,7 +175,7 @@ private fun Badge(text: String, muted: Boolean = false) {
             MaterialTheme.colorScheme.onPrimary
         },
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(50))
             .background(
                 if (muted) {
                     MaterialTheme.colorScheme.surfaceVariant
@@ -181,7 +183,7 @@ private fun Badge(text: String, muted: Boolean = false) {
                     MaterialTheme.colorScheme.primary
                 },
             )
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(horizontal = 8.dp, vertical = 3.dp),
     )
 }
 
@@ -211,17 +213,23 @@ fun LazyListScope.sessionsSection(
         }
     }
 
-    items(sessions, key = { "session-${it.type.name}" }) { session ->
-        SessionRow(
-            session = session,
-            now = now,
-            zone = zone,
-            alarmOn = alarmOn(session.type),
-            leadMinutes = leadMinutes(session.type),
-            overridden = isOverridden(session.type),
-            onToggle = { onToggle(session.type, it) },
-        )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    item(key = "sessions-card") {
+        SectionCard {
+            sessions.forEachIndexed { index, session ->
+                SessionRow(
+                    session = session,
+                    now = now,
+                    zone = zone,
+                    alarmOn = alarmOn(session.type),
+                    leadMinutes = leadMinutes(session.type),
+                    overridden = isOverridden(session.type),
+                    onToggle = { onToggle(session.type, it) },
+                )
+                if (index != sessions.lastIndex) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+        }
     }
 }
 
@@ -302,12 +310,16 @@ fun LazyListScope.resultsSection(
         return
     }
 
-    item(key = "results-columns") {
-        TableHeader(listOf("POS" to 28, "DRIVER" to 0, "TIME / STATUS" to 0, "PTS" to 30))
-    }
-    items(results, key = { "result-${it.position}" }) { result ->
-        ResultRow(result)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    item(key = "results-card") {
+        SectionCard {
+            TableHeader(listOf("POS" to 28, "DRIVER" to 0, "TIME / STATUS" to 0, "PTS" to 30))
+            results.forEachIndexed { index, result ->
+                ResultRow(result)
+                if (index != results.lastIndex) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+        }
     }
 }
 
@@ -401,9 +413,15 @@ fun LazyListScope.qualifyingSection(
         return
     }
 
-    items(results, key = { "quali-${it.position}" }) { result ->
-        QualifyingRow(result)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    item(key = "qualifying-card") {
+        SectionCard {
+            results.forEachIndexed { index, result ->
+                QualifyingRow(result)
+                if (index != results.lastIndex) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+        }
     }
 }
 
@@ -479,12 +497,16 @@ fun LazyListScope.driverStandingsSection(
         return
     }
 
-    item(key = "standings-columns") {
-        TableHeader(listOf("POS" to 28, "DRIVER" to 0, "WINS" to 40, "PTS" to 44))
-    }
-    items(standings, key = { "standing-${it.driver.id}" }) { standing ->
-        DriverStandingRow(standing)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    item(key = "standings-card") {
+        SectionCard {
+            TableHeader(listOf("POS" to 28, "DRIVER" to 0, "WINS" to 40, "PTS" to 44))
+            standings.forEachIndexed { index, standing ->
+                DriverStandingRow(standing)
+                if (index != standings.lastIndex) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+        }
     }
 }
 
