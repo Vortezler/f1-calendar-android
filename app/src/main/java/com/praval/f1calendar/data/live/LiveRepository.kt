@@ -202,29 +202,44 @@ class LiveRepository @Inject constructor(
     /**
      * The grid for a race, which is published against the qualifying session that set it and
      * already has every post-qualifying penalty applied.
+     *
+     * A grid is only worth reading next to where each driver qualified. Pass [qualifyingByCode]
+     * (keyed on the three-letter code) when the caller already holds a qualifying classification —
+     * OpenF1 rate-limits bursts, and asking it for an order the app already has is the request most
+     * likely to be the one refused.
      */
-    suspend fun startingGrid(season: Int, qualifyingStart: Instant): Res<List<GridSlot>> = apiCall {
+    suspend fun startingGrid(
+        season: Int,
+        qualifyingStart: Instant,
+        qualifyingByCode: Map<String, Int> = emptyMap(),
+    ): Res<List<GridSlot>> = apiCall {
         val sessionKey = sessionKeyFor(season, SessionType.QUALIFYING, qualifyingStart)
             ?: return@apiCall emptyList()
         val grid = api.startingGrid(sessionKey)
         if (grid.isEmpty()) return@apiCall emptyList()
 
         val drivers = driversFor(sessionKey)
-        // Same session key, so the qualifying order comes back from the call the grid deviates from.
-        val qualifyingPosition = runCatching { api.sessionResult(sessionKey) }
-            .getOrDefault(emptyList())
-            .mapNotNull { row -> row.position?.let { row.driverNumber to it } }
-            .toMap()
+        // Same session key, so the order the grid deviates from comes from the same place.
+        val qualifyingByNumber = if (qualifyingByCode.isNotEmpty()) {
+            emptyMap()
+        } else {
+            runCatching { api.sessionResult(sessionKey) }
+                .getOrDefault(emptyList())
+                .mapNotNull { row -> row.position?.let { row.driverNumber to it } }
+                .toMap()
+        }
 
         grid.sortedBy { it.position }.map { slot ->
             val driver = drivers[slot.driverNumber]
+            val code = driver?.acronym
             GridSlot(
                 position = slot.position,
                 driverName = driver.displayName(slot.driverNumber),
-                driverShort = driver?.acronym ?: slot.driverNumber.toString(),
+                driverShort = code ?: slot.driverNumber.toString(),
                 teamName = driver?.teamName,
                 teamId = TeamColors.constructorIdForTeamName(driver?.teamName),
-                qualifyingPosition = qualifyingPosition[slot.driverNumber],
+                qualifyingPosition = qualifyingByCode[code?.uppercase()]
+                    ?: qualifyingByNumber[slot.driverNumber],
             )
         }
     }

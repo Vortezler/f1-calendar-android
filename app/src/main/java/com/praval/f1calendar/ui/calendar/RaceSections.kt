@@ -470,7 +470,7 @@ fun LazyListScope.qualifyingSection(
 
     item(key = "grid-card") {
         SectionCard {
-            TableHeader(listOf("POS" to 28, "DRIVER" to 0, "FROM QUALI" to 76))
+            TableHeader(listOf("POS" to 28, "DRIVER" to 0, "VS QUALI" to 88))
             grid.forEachIndexed { index, slot ->
                 GridRow(slot)
                 if (index != grid.lastIndex) {
@@ -563,7 +563,7 @@ private fun GridMovement(slot: GridSlot) {
     val qualified = slot.qualifyingPosition
     Column(
         horizontalAlignment = Alignment.End,
-        modifier = Modifier.width(76.dp),
+        modifier = Modifier.width(88.dp),
     ) {
         Text(
             text = when {
@@ -582,10 +582,11 @@ private fun GridMovement(slot: GridSlot) {
         )
         if (qualified != null && movement != null && movement != 0) {
             Text(
-                text = "qualified P$qualified",
+                text = "from P$qualified",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
+                softWrap = false,
             )
         }
     }
@@ -738,6 +739,10 @@ private fun TableHeader(columns: List<Pair<String, Int>>) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = if (width > 0 && index > 0) TextAlign.End else TextAlign.Start,
+                // Narrow columns are sized for their values, not their labels, so a label that
+                // doesn't quite fit should stay on one line rather than break in half.
+                maxLines = 1,
+                softWrap = false,
                 modifier = if (width > 0) Modifier.width(width.dp) else Modifier.weight(1f),
             )
         }

@@ -396,10 +396,17 @@ class CalendarViewModel @Inject constructor(
         if (gridState.value.round == race.round && gridState.value.slots.isNotEmpty()) return
 
         gridState.update { it.copy(loading = true) }
+        val qualifying = uiState.value.qualifying
         // A race that has run carries its own as-raced grid, so it needs no network call at all.
-        val slots = gridFromResults(uiState.value.results, uiState.value.qualifying)
+        val slots = gridFromResults(uiState.value.results, qualifying)
             ?: race.session(SessionType.QUALIFYING)?.startsAt?.let { start ->
-                liveRepository.startingGrid(race.season, start).dataOrNull()
+                liveRepository.startingGrid(
+                    season = race.season,
+                    qualifyingStart = start,
+                    qualifyingByCode = qualifying.associate {
+                        it.driver.shortName.uppercase() to it.position
+                    },
+                ).dataOrNull()
             }.orEmpty()
         gridState.update { it.copy(loading = false, slots = slots, round = race.round) }
     }
