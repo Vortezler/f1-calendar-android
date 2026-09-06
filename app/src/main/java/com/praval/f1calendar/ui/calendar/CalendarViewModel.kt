@@ -4,10 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.praval.f1calendar.core.PendingRaceSelection
 import com.praval.f1calendar.core.Res
+import com.praval.f1calendar.core.dataOrNull
+import com.praval.f1calendar.data.live.LiveRepository
 import com.praval.f1calendar.data.prefs.SettingsStore
 import com.praval.f1calendar.data.repository.RaceRepository
 import com.praval.f1calendar.data.repository.StandingsRepository
 import com.praval.f1calendar.domain.model.DriverStanding
+import com.praval.f1calendar.domain.model.GridSlot
 import com.praval.f1calendar.domain.model.QualifyingResult
 import com.praval.f1calendar.domain.model.Race
 import com.praval.f1calendar.domain.model.RaceResult
@@ -45,7 +48,13 @@ data class CalendarUiState(
     val selectedRound: Int? = null,
     val selectedRace: Race? = null,
     val results: List<RaceResult> = emptyList(),
+    /** True when [results] came from live timing because the official classification isn't out yet. */
+    val resultsAreProvisional: Boolean = false,
     val qualifying: List<QualifyingResult> = emptyList(),
+    /** Qualifying can be read either as it was set, or as the grid it became once penalties landed. */
+    val showStartingGrid: Boolean = false,
+    val startingGrid: List<GridSlot> = emptyList(),
+    val gridLoading: Boolean = false,
     val driverStandings: List<DriverStanding> = emptyList(),
     val rules: Map<SessionType, SessionAlarmRule> = emptyMap(),
     val overrides: Map<SessionType, Boolean> = emptyMap(),
@@ -89,11 +98,33 @@ private data class LoadState(
     val error: String? = null,
 )
 
+/** Live-timing results held for one round while the official classification is still missing. */
+private data class ProvisionalResults(
+    val round: Int? = null,
+    val results: List<RaceResult> = emptyList(),
+)
+
+private data class GridState(
+    val showing: Boolean = false,
+    val round: Int? = null,
+    val slots: List<GridSlot> = emptyList(),
+    val loading: Boolean = false,
+)
+
+/** Everything that isn't per-round data, folded together to stay inside `combine`'s arity. */
+private data class ScreenState(
+    val useUtc: Boolean,
+    val load: LoadState,
+    val provisional: ProvisionalResults,
+    val grid: GridState,
+)
+
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
     private val raceRepository: RaceRepository,
     private val standingsRepository: StandingsRepository,
+    private val liveRepository: LiveRepository,
     private val scheduler: NotificationScheduler,
     private val resultScheduler: SessionResultScheduler,
     private val pendingRaceSelection: PendingRaceSelection,
@@ -102,6 +133,8 @@ class CalendarViewModel @Inject constructor(
 
     private val loadState = MutableStateFlow(LoadState())
     private val selectedRound = MutableStateFlow<Int?>(null)
+    private val provisionalResults = MutableStateFlow(ProvisionalResults())
+    private val gridState = MutableStateFlow(GridState())
 
     /** Survives until the schedule that contains it has actually loaded. */
     private var requestedRound: Int? = null
@@ -146,8 +179,17 @@ class CalendarViewModel @Inject constructor(
         selectedRound,
         raceDetail,
         seasonFlow.flatMapLatest { standingsRepository.observeDrivers(it) },
-        combine(settings.useUtc, loadState) { useUtc, load -> useUtc to load },
-    ) { season, round, detail, standings, (useUtc, load) ->
+        combine(
+            settings.useUtc,
+            loadState,
+            provisionalResults,
+            gridState,
+        ) { useUtc, load, provisional, grid -> ScreenState(useUtc, load, provisional, grid) },
+    ) { season, round, detail, standings, screen ->
+        // Live timing stands in only while the official classification is genuinely absent.
+        val provisional = screen.provisional.results
+            .takeIf { it.isNotEmpty() && detail.results.isEmpty() && screen.provisional.round == round }
+            .orEmpty()
         CalendarUiState(
             season = season.season,
             races = season.races,
@@ -155,15 +197,19 @@ class CalendarViewModel @Inject constructor(
             followingCurrentSeason = season.followingCurrent,
             selectedRound = round,
             selectedRace = season.races.firstOrNull { it.round == round },
-            results = detail.results,
+            results = detail.results.ifEmpty { provisional },
+            resultsAreProvisional = provisional.isNotEmpty(),
             qualifying = detail.qualifying,
+            showStartingGrid = screen.grid.showing,
+            startingGrid = screen.grid.slots.takeIf { screen.grid.round == round }.orEmpty(),
+            gridLoading = screen.grid.loading,
             driverStandings = standings,
             rules = detail.rules,
             overrides = detail.overrides,
-            useUtc = useUtc,
-            isRefreshing = load.refreshing,
-            loadedOnce = load.loadedOnce,
-            errorMessage = load.error,
+            useUtc = screen.useUtc,
+            isRefreshing = screen.load.refreshing,
+            loadedOnce = screen.load.loadedOnce,
+            errorMessage = screen.load.error,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CalendarUiState())
 
@@ -305,7 +351,18 @@ class CalendarViewModel @Inject constructor(
         }
     }
 
+    /** Switches the qualifying section between the times set and the grid they became. */
+    fun toggleStartingGrid() {
+        val showing = !gridState.value.showing
+        gridState.update { it.copy(showing = showing) }
+        if (showing) viewModelScope.launch { loadStartingGrid() }
+    }
+
     private suspend fun loadRaceDetail(season: Int, round: Int, force: Boolean) {
+        // Both are per-round, and the round has just changed underneath them.
+        gridState.update { GridState(showing = it.showing) }
+        provisionalResults.value = ProvisionalResults()
+
         val race = raceRepository.observeRace(season, round).first() ?: return
         val now = Instant.now()
 
@@ -316,7 +373,62 @@ class CalendarViewModel @Inject constructor(
         }
         if (race.isCompleted(now)) {
             raceRepository.refreshResults(season, round, force)
+            loadProvisionalResults(race)
         }
+        if (gridState.value.showing) loadStartingGrid()
+    }
+
+    /**
+     * Jolpica can take most of a day to publish a classification. When it hasn't yet, live timing
+     * has had the same order since minutes after the flag, so the table is filled from there and
+     * labelled as provisional rather than left empty.
+     */
+    private suspend fun loadProvisionalResults(race: Race) {
+        if (raceRepository.observeResults(race.season, race.round).first().isNotEmpty()) return
+        val start = race.session(SessionType.RACE)?.startsAt ?: race.raceStart ?: return
+        val live = liveRepository.classification(race.season, SessionType.RACE, start).dataOrNull()
+        if (live.isNullOrEmpty()) return
+        provisionalResults.value = ProvisionalResults(race.round, live)
+    }
+
+    private suspend fun loadStartingGrid() {
+        val race = uiState.value.selectedRace ?: return
+        if (gridState.value.round == race.round && gridState.value.slots.isNotEmpty()) return
+
+        gridState.update { it.copy(loading = true) }
+        // A race that has run carries its own as-raced grid, so it needs no network call at all.
+        val slots = gridFromResults(uiState.value.results, uiState.value.qualifying)
+            ?: race.session(SessionType.QUALIFYING)?.startsAt?.let { start ->
+                liveRepository.startingGrid(race.season, start).dataOrNull()
+            }.orEmpty()
+        gridState.update { it.copy(loading = false, slots = slots, round = race.round) }
+    }
+
+    /**
+     * The `grid` on a race result is where the driver actually started, penalties included, so a
+     * completed round needs nothing else. Null when the field isn't populated — pre-2005 rounds and
+     * any race that hasn't run.
+     */
+    private fun gridFromResults(
+        results: List<RaceResult>,
+        qualifying: List<QualifyingResult>,
+    ): List<GridSlot>? {
+        if (results.none { (it.grid ?: 0) > 0 }) return null
+        val qualifiedAt = qualifying.associate { it.driver.id to it.position }
+        return results
+            .filter { it.grid != null }
+            // A pit-lane start is reported as 0 and belongs behind the whole grid, not in front.
+            .sortedBy { if (it.grid!! <= 0) Int.MAX_VALUE else it.grid }
+            .map { result ->
+                GridSlot(
+                    position = result.grid ?: 0,
+                    driverName = result.driver.fullName,
+                    driverShort = result.driver.shortName,
+                    teamName = result.team.name,
+                    teamId = result.team.id,
+                    qualifyingPosition = qualifiedAt[result.driver.id],
+                )
+            }
     }
 
     /** Opens on the next race still to run; once the season is over, on the finale. */

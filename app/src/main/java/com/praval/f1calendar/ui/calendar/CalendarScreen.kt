@@ -227,12 +227,21 @@ fun CalendarScreen(
                                     results = state.results,
                                     race = race,
                                     now = now,
+                                    provisional = state.resultsAreProvisional,
                                 )
 
                                 qualifyingSection(
                                     results = state.qualifying,
+                                    grid = state.startingGrid,
+                                    showGrid = state.showStartingGrid,
+                                    gridLoading = state.gridLoading,
                                     race = race,
                                     now = now,
+                                    onShowGrid = { wanted ->
+                                        if (wanted != state.showStartingGrid) {
+                                            viewModel.toggleStartingGrid()
+                                        }
+                                    },
                                 )
 
                                 if (race.isCompleted(now)) sessions()

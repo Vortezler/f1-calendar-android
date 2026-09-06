@@ -5,6 +5,8 @@ import com.praval.f1calendar.data.live.dto.OpenF1IntervalDto
 import com.praval.f1calendar.data.live.dto.OpenF1LapDto
 import com.praval.f1calendar.data.live.dto.OpenF1PositionDto
 import com.praval.f1calendar.data.live.dto.OpenF1SessionDto
+import com.praval.f1calendar.data.live.dto.OpenF1SessionResultDto
+import com.praval.f1calendar.data.live.dto.OpenF1StartingGridDto
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -23,6 +25,23 @@ interface OpenF1Api {
     suspend fun sessions(
         @Query("session_key") sessionKey: String = LATEST,
     ): List<OpenF1SessionDto>
+
+    /** Every session of one name in a season — ~24 rows, which is how a calendar round is matched. */
+    @GET("v1/sessions")
+    suspend fun sessionsInYear(
+        @Query("year") year: Int,
+        @Query("session_name") sessionName: String,
+    ): List<OpenF1SessionDto>
+
+    @GET("v1/session_result")
+    suspend fun sessionResult(
+        @Query("session_key") sessionKey: Int,
+    ): List<OpenF1SessionResultDto>
+
+    @GET("v1/starting_grid")
+    suspend fun startingGrid(
+        @Query("session_key") sessionKey: Int,
+    ): List<OpenF1StartingGridDto>
 
     @GET("v1/drivers")
     suspend fun drivers(

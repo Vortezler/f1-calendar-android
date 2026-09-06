@@ -15,7 +15,9 @@ import androidx.work.WorkerParameters
 import com.praval.f1calendar.MainActivity
 import com.praval.f1calendar.R
 import com.praval.f1calendar.core.Res
+import com.praval.f1calendar.core.dataOrNull
 import com.praval.f1calendar.core.map
+import com.praval.f1calendar.data.live.LiveRepository
 import com.praval.f1calendar.data.repository.RaceRepository
 import com.praval.f1calendar.domain.model.RaceResult
 import com.praval.f1calendar.domain.model.SessionType
@@ -27,64 +29,98 @@ import kotlinx.coroutines.flow.first
  * Checks whether a just-finished session's results are published yet and, if so, posts a
  * notification summarising them.
  *
- * Race, qualifying and sprint all have a real classification to wait for, so an empty result is
- * treated as "not published yet" and retried (WorkManager's backoff, capped at [MAX_ATTEMPTS]).
- * Practice sessions and sprint qualifying have no classification endpoint at all — Jolpica never
- * published one — so those just announce that the session is over.
+ * Two sources are tried, in the order they become true. Jolpica is the app's own record but only
+ * publishes a classification hours after the flag, so OpenF1's live timing — which has the same
+ * order within seconds, and covers practice and sprint qualifying, which Jolpica never publishes at
+ * all — is what actually carries the notification on the day. Neither having anything yet means the
+ * session simply isn't classified, so the work retries with backoff up to [MAX_ATTEMPTS].
  */
 @HiltWorker
 class SessionResultWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
     private val raceRepository: RaceRepository,
+    private val liveRepository: LiveRepository,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
         val season = inputData.getInt(KEY_SEASON, 0)
         val round = inputData.getInt(KEY_ROUND, 0)
-        val type = SessionType.fromName(inputData.getString(KEY_SESSION).orEmpty()) ?: return Result.failure()
+        val type = SessionType.fromName(inputData.getString(KEY_SESSION).orEmpty())
+            ?: return Result.failure()
         val raceName = inputData.getString(KEY_RACE_NAME) ?: return Result.failure()
 
-        val notificationText = when (type) {
-            SessionType.RACE -> classifiedText(raceName, "Race") {
-                raceRepository.refreshResults(season, round, force = true).map {
-                    raceRepository.observeResults(season, round).first()
-                }
-            } ?: return giveUpOrRetry()
+        val body = officialSummary(season, round, type, raceName)
+            ?: liveSummary(season, round, type, raceName)
+            ?: return giveUpOrRetry()
 
-            SessionType.QUALIFYING -> {
-                val outcome = raceRepository.refreshQualifying(season, round, force = true)
-                if (outcome is Res.Error) return giveUpOrRetry()
-                val pole = raceRepository.observeQualifying(season, round).first().firstOrNull()
-                    ?: return giveUpOrRetry()
-                "${pole.driver.fullName} takes pole for $raceName."
-            }
-
-            SessionType.SPRINT -> classifiedText(raceName, "Sprint") {
-                raceRepository.fetchSprintResults(season, round)
-            } ?: return giveUpOrRetry()
-
-            SessionType.FP1, SessionType.FP2, SessionType.FP3, SessionType.SPRINT_QUALIFYING ->
-                "$raceName — ${type.label} has finished."
-        }
-
-        postNotification(season, round, type, notificationText)
+        postNotification(season, round, type, body)
         return Result.success()
     }
 
-    /** Runs [fetch], and returns its summary sentence only once real classified rows come back. */
-    private suspend fun classifiedText(
+    /** Jolpica's own classification, for the session types it carries. Null until it publishes. */
+    private suspend fun officialSummary(
+        season: Int,
+        round: Int,
+        type: SessionType,
         raceName: String,
-        label: String,
-        fetch: suspend () -> Res<List<RaceResult>>,
-    ): String? {
-        val results = when (val outcome = fetch()) {
-            is Res.Error -> return null
-            is Res.Success -> outcome.data
-            Res.Loading -> return null
+    ): String? = when (type) {
+        SessionType.RACE -> {
+            val outcome = raceRepository.refreshResults(season, round, force = true).map {
+                raceRepository.observeResults(season, round).first()
+            }
+            podiumText(raceName, type, outcome.dataOrNull().orEmpty())
         }
-        val winner = results.firstOrNull { it.isClassified } ?: return null
+
+        SessionType.SPRINT ->
+            podiumText(raceName, type, raceRepository.fetchSprintResults(season, round).dataOrNull().orEmpty())
+
+        SessionType.QUALIFYING -> {
+            val refresh = raceRepository.refreshQualifying(season, round, force = true)
+            val pole = if (refresh is Res.Error) {
+                null
+            } else {
+                raceRepository.observeQualifying(season, round).first().firstOrNull()
+            }
+            pole?.let { "${it.driver.fullName} takes pole for $raceName." }
+        }
+
+        // Jolpica has never published a practice or sprint-qualifying classification.
+        else -> null
+    }
+
+    /** OpenF1's live timing, which is classified within seconds of the flag for every session. */
+    private suspend fun liveSummary(
+        season: Int,
+        round: Int,
+        type: SessionType,
+        raceName: String,
+    ): String? {
+        val startsAt = raceRepository.observeRace(season, round).first()
+            ?.session(type)?.startsAt
+            ?: return null
+        val rows = liveRepository.classification(season, type, startsAt).dataOrNull().orEmpty()
+        val leader = rows.firstOrNull() ?: return null
+
+        return when (type) {
+            SessionType.RACE, SessionType.SPRINT -> podiumText(raceName, type, rows)
+            SessionType.QUALIFYING -> "${leader.driver.fullName} takes pole for $raceName."
+            SessionType.SPRINT_QUALIFYING ->
+                "${leader.driver.fullName} takes sprint pole for $raceName."
+            // A practice session has no prize, so the headline is simply who ended up on top.
+            SessionType.FP1, SessionType.FP2, SessionType.FP3 -> buildString {
+                append("${leader.driver.fullName} fastest in ${type.label} at $raceName")
+                leader.time?.let { append(" ($it)") }
+                append(".")
+            }
+        }
+    }
+
+    /** "X wins, Y and Z complete the podium" — or just the winner when fewer than three finish. */
+    private fun podiumText(raceName: String, type: SessionType, results: List<RaceResult>): String? {
         val podium = results.filter { it.isClassified }.take(3)
+        val winner = podium.firstOrNull() ?: return null
+        val label = if (type == SessionType.SPRINT) "Sprint" else "Race"
         return if (podium.size >= 3) {
             "$raceName: ${winner.driver.fullName} wins! ${podium[1].driver.shortName} P2, " +
                 "${podium[2].driver.shortName} P3."

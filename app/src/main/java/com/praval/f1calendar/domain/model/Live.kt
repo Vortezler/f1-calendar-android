@@ -37,6 +37,27 @@ data class LiveSession(
     }
 }
 
+/**
+ * One slot on the grid as the cars actually line up.
+ *
+ * This is deliberately not the qualifying classification: penalties are applied between the two,
+ * so a driver's [position] here can differ from where they qualified.
+ */
+data class GridSlot(
+    val position: Int,
+    val driverName: String,
+    val driverShort: String,
+    val teamName: String?,
+    val teamId: String?,
+    val qualifyingPosition: Int?,
+) {
+    /** Places gained (positive) or lost (negative) between qualifying and the grid. */
+    val movement: Int? get() = qualifyingPosition?.let { it - position }
+
+    /** A pit-lane start is reported as grid position 0 and has no slot on the grid proper. */
+    val startsFromPitLane: Boolean get() = position <= 0
+}
+
 data class LiveStanding(
     val position: Int?,
     val driverNumber: Int,

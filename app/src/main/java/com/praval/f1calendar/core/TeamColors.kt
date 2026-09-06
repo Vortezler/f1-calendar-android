@@ -45,6 +45,34 @@ object TeamColors {
         "team_lotus" to 0xFF004225,
     )
 
+    /**
+     * OpenF1 names teams the way the broadcast does ("Red Bull Racing"), while everything else in
+     * the app is keyed on Ergast's `constructorId`. Matching is on a distinctive word rather than
+     * the whole string, since the sponsor prefixes teams carry change from season to season.
+     */
+    private val idByTeamNameFragment: List<Pair<String, String>> = listOf(
+        "red bull" to "red_bull",
+        "mercedes" to "mercedes",
+        "ferrari" to "ferrari",
+        "mclaren" to "mclaren",
+        "aston martin" to "aston_martin",
+        "alpine" to "alpine",
+        "williams" to "williams",
+        "haas" to "haas",
+        "audi" to "audi",
+        "cadillac" to "cadillac",
+        "sauber" to "sauber",
+        "alphatauri" to "alphatauri",
+        // Checked after AlphaTauri, whose name would otherwise never match this.
+        "rb" to "rb",
+    )
+
     fun forConstructor(constructorId: String?): Long =
         byConstructorId[constructorId?.lowercase()] ?: UNKNOWN
+
+    /** Best-effort `constructorId` for a broadcast team name; null when nothing matches. */
+    fun constructorIdForTeamName(teamName: String?): String? {
+        val name = teamName?.lowercase()?.trim() ?: return null
+        return idByTeamNameFragment.firstOrNull { (fragment, _) -> name.contains(fragment) }?.second
+    }
 }

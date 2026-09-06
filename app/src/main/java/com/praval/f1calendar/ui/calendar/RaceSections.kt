@@ -1,9 +1,11 @@
 package com.praval.f1calendar.ui.calendar
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,11 +28,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.praval.f1calendar.domain.model.DriverStanding
+import com.praval.f1calendar.domain.model.GridSlot
 import com.praval.f1calendar.domain.model.QualifyingResult
 import com.praval.f1calendar.domain.model.Race
 import com.praval.f1calendar.domain.model.RaceResult
@@ -294,8 +298,20 @@ fun LazyListScope.resultsSection(
     results: List<RaceResult>,
     race: Race,
     now: Instant,
+    provisional: Boolean = false,
 ) {
-    item(key = "results-header") { SectionHeader("Race result") }
+    item(key = "results-header") {
+        SectionHeader("Race result", trailing = if (provisional) "PROVISIONAL" else null)
+    }
+
+    if (provisional) {
+        item(key = "results-provisional") {
+            SectionPlaceholder(
+                "Unofficial, from live timing. The official classification replaces it once it's " +
+                    "published.",
+            )
+        }
+    }
 
     if (results.isEmpty()) {
         item(key = "results-empty") {
@@ -394,12 +410,18 @@ private fun ResultRow(result: RaceResult) {
 
 fun LazyListScope.qualifyingSection(
     results: List<QualifyingResult>,
+    grid: List<GridSlot>,
+    showGrid: Boolean,
+    gridLoading: Boolean,
     race: Race,
     now: Instant,
+    onShowGrid: (Boolean) -> Unit,
 ) {
-    item(key = "qualifying-header") { SectionHeader("Qualifying") }
+    item(key = "qualifying-header") {
+        SectionHeader(if (showGrid) "Starting grid" else "Qualifying")
+    }
 
-    if (results.isEmpty()) {
+    if (results.isEmpty() && grid.isEmpty()) {
         val qualifyingStart = race.session(SessionType.QUALIFYING)?.startsAt
         item(key = "qualifying-empty") {
             SectionPlaceholder(
@@ -413,14 +435,158 @@ fun LazyListScope.qualifyingSection(
         return
     }
 
-    item(key = "qualifying-card") {
+    // Penalties are applied after qualifying, so the order the times were set in is not the order
+    // the cars line up in. Both are worth reading, so neither is hidden behind the other.
+    item(key = "qualifying-switch") {
+        GridSwitch(showGrid = showGrid, onSelect = onShowGrid)
+    }
+
+    if (!showGrid) {
+        item(key = "qualifying-card") {
+            SectionCard {
+                results.forEachIndexed { index, result ->
+                    QualifyingRow(result)
+                    if (index != results.lastIndex) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    if (grid.isEmpty()) {
+        item(key = "grid-empty") {
+            SectionPlaceholder(
+                if (gridLoading) {
+                    "Checking the grid…"
+                } else {
+                    "The grid for this round hasn't been published yet."
+                },
+            )
+        }
+        return
+    }
+
+    item(key = "grid-card") {
         SectionCard {
-            results.forEachIndexed { index, result ->
-                QualifyingRow(result)
-                if (index != results.lastIndex) {
+            TableHeader(listOf("POS" to 28, "DRIVER" to 0, "FROM QUALI" to 76))
+            grid.forEachIndexed { index, slot ->
+                GridRow(slot)
+                if (index != grid.lastIndex) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
+        }
+    }
+}
+
+/** Two-way switch between the qualifying classification and the grid it turned into. */
+@Composable
+private fun GridSwitch(showGrid: Boolean, onSelect: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(3.dp),
+    ) {
+        SwitchHalf("Qualifying", selected = !showGrid) { onSelect(false) }
+        SwitchHalf("Starting grid", selected = showGrid) { onSelect(true) }
+    }
+}
+
+@Composable
+private fun RowScope.SwitchHalf(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+        textAlign = TextAlign.Center,
+        color = if (selected) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(50))
+            .background(
+                if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun GridRow(slot: GridSlot) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        PositionBadge(
+            text = if (slot.startsFromPitLane) "PL" else slot.position.toString(),
+            highlighted = !slot.startsFromPitLane && slot.position <= 3,
+        )
+        Spacer(Modifier.width(8.dp))
+        TeamAccent(slot.teamId, height = 36)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = slot.driverName,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = slot.teamName.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        GridMovement(slot)
+    }
+}
+
+/** How far a penalty (or someone else's) moved this driver from where they qualified. */
+@Composable
+private fun GridMovement(slot: GridSlot) {
+    val movement = slot.movement
+    val qualified = slot.qualifyingPosition
+    Column(
+        horizontalAlignment = Alignment.End,
+        modifier = Modifier.width(76.dp),
+    ) {
+        Text(
+            text = when {
+                qualified == null -> "—"
+                movement == null || movement == 0 -> "P$qualified"
+                movement > 0 -> "▲ $movement"
+                else -> "▼ ${-movement}"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = if (movement != null && movement != 0) FontWeight.Bold else FontWeight.Normal,
+            color = when {
+                movement == null || movement == 0 -> MaterialTheme.colorScheme.onSurfaceVariant
+                movement > 0 -> MaterialTheme.colorScheme.tertiary
+                else -> MaterialTheme.colorScheme.error
+            },
+        )
+        if (qualified != null && movement != null && movement != 0) {
+            Text(
+                text = "qualified P$qualified",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }
